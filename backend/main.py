@@ -27,10 +27,11 @@ async def lifespan(app: FastAPI):
 
     # 生产安全检查
     if settings.jwt_secret in _INSECURE_SECRETS:
-        logger.warning(
-            "⚠️  JWT_SECRET 使用了不安全的默认值！"
+        logger.critical(
+            "JWT_SECRET 使用了不安全的默认值，强制退出。"
             " 请在 .env 中设置随机密钥：openssl rand -hex 32"
         )
+        raise RuntimeError("jwt_secret 使用了不安全的默认值，必须在 .env 中设置随机密钥")
 
     init_clients()
     logger.info("外部服务客户端初始化完成")
@@ -64,7 +65,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"未处理异常: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"code": 500, "message": "服务器内部错误", "detail": str(exc)},
+        content={"code": 500, "message": "服务器内部错误，请联系管理员"},
     )
 
 

@@ -52,21 +52,25 @@ export async function listKBs(): Promise<KnowledgeBase[]> {
   return request('/kb')
 }
 
-export async function createKB(name: string, description: string): Promise<KnowledgeBase> {
-  return request('/kb', { method: 'POST', body: JSON.stringify({ name, description }) })
+export async function createKB(name: string, description: string, top_k = 5, score_threshold = 0.5): Promise<KnowledgeBase> {
+  return request('/kb', { method: 'POST', body: JSON.stringify({ name, description, top_k, score_threshold }) })
 }
 
 export async function deleteKB(kbId: number): Promise<void> {
   return request(`/kb/${kbId}`, { method: 'DELETE' })
 }
 
-export async function updateKB(kbId: number, data: { name?: string; description?: string }): Promise<KnowledgeBase> {
+export async function updateKB(kbId: number, data: { name?: string; description?: string; top_k?: number; score_threshold?: number }): Promise<KnowledgeBase> {
   return request(`/kb/${kbId}`, { method: 'PATCH', body: JSON.stringify(data) })
 }
 
 // Documents
 export async function listDocuments(kbId: number): Promise<Document[]> {
   return request(`/kb/${kbId}/documents`)
+}
+
+export async function retryDocument(kbId: number, docId: number): Promise<Document> {
+  return request(`/kb/${kbId}/documents/${docId}/retry`, { method: 'POST' })
 }
 
 export async function uploadDocument(kbId: number, file: File): Promise<Document> {

@@ -3,9 +3,6 @@ import { useRef, useState, useCallback } from 'react'
 type OnRecordingComplete = (blob: Blob, ext: string) => void
 
 // 按优先级选择浏览器支持的格式
-// ogg/opus  → 阿里百炼 STT 支持，Chrome/Firefox 支持
-// mp4/aac   → 阿里百炼 STT 支持，Safari 支持
-// webm      → 阿里百炼 STT 不支持，仅作最后兜底
 function pickMimeType(): { mimeType: string; ext: string } {
   const candidates = [
     { mimeType: 'audio/ogg;codecs=opus', ext: 'ogg' },
@@ -26,6 +23,9 @@ export function useRecorder(onComplete: OnRecordingComplete) {
   const [error, setError] = useState<string | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
+  const streamRef = useRef<MediaStream | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
 
   const startRecording = useCallback(async () => {
     setError(null)
@@ -51,12 +51,29 @@ export function useRecorder(onComplete: OnRecordingComplete) {
       return
     }
 
+    streamRef.current = stream
+
+    // Set up analyser for waveform visualization
+    try {
+      const audioContext = new AudioContext()
+      audioContextRef.current = audioContext
+      const source = audioContext.createMediaStreamSource(stream)
+      const analyser = audioContext.createAnalyser()
+      analyser.fftSize = 64
+      source.connect(analyser)
+      analyserRef.current = analyser
+    } catch {
+      // Analyser is optional — don't fail if it doesn't work
+      analyserRef.current = null
+    }
+
     const { mimeType, ext } = pickMimeType()
     let recorder: MediaRecorder
     try {
       recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {})
     } catch (e: any) {
       stream.getTracks().forEach((t) => t.stop())
+      if (audioContextRef.current) { audioContextRef.current.close(); audioContextRef.current = null }
       setError(`录音格式不支持: ${e.message}`)
       return
     }
@@ -69,6 +86,8 @@ export function useRecorder(onComplete: OnRecordingComplete) {
 
     recorder.onstop = () => {
       stream.getTracks().forEach((t) => t.stop())
+      if (audioContextRef.current) { audioContextRef.current.close(); audioContextRef.current = null }
+      analyserRef.current = null
       const finalMime = mimeType || recorder.mimeType || 'audio/webm'
       const blob = new Blob(chunksRef.current, { type: finalMime })
       onComplete(blob, ext)
@@ -85,9 +104,10 @@ export function useRecorder(onComplete: OnRecordingComplete) {
     if (recorder && recorder.state !== 'inactive') {
       recorder.stop()
       mediaRecorderRef.current = null
+      streamRef.current = null
       setRecording(false)
     }
   }, [])
 
-  return { recording, error, startRecording, stopRecording }
+  return { recording, error, startRecording, stopRecording, analyserRef }
 }

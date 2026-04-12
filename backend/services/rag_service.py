@@ -1,10 +1,11 @@
 import asyncio
 import hashlib
-import time
-from collections import OrderedDict
+import json
 from concurrent.futures import ThreadPoolExecutor
 from typing import AsyncGenerator
+
 from chroma_client import get_collection
+from redis_client import redis_client
 from services.embedding_service import get_embedding
 from services.llm_service import chat_completion_stream, simple_chat
 from services.memory_service import compress_history
@@ -12,10 +13,9 @@ from loguru import logger
 
 _chroma_executor = ThreadPoolExecutor(max_workers=10)
 
-# In-memory LRU cache: keyed by (kb_id, context_hash, question) -> (response_text, sources)
-# context_hash = hash of retrieved chunks so semantically same context = cache hit
-_response_cache: OrderedDict[tuple[int, str, str], tuple[str, list[dict]]] = OrderedDict()
-_CACHE_MAX_SIZE = 500
+# Redis cache key prefix
+_CACHE_KEY_PREFIX = "rag_cache"
+_CACHE_TTL_SECONDS = 3600  # 1 hour
 
 SYSTEM_PROMPT = """你是一个知识库问答助手。请根据以下参考资料回答用户的问题。
 回答时必须在末尾列出引用来源（格式：[来源：文件名，第X段]）。
@@ -34,23 +34,41 @@ def _make_context_hash(chunks: list[dict]) -> str:
     return hashlib.sha256("|".join(key_parts).encode()).hexdigest()[:16]
 
 
-def _cache_get(kb_id: int, question: str, context_hash: str) -> tuple[str, list[dict]] | None:
-    key = (kb_id, context_hash, question)
-    if key in _response_cache:
-        _response_cache.move_to_end(key)
-        return _response_cache[key]
+def _make_history_hash(history_messages: list[dict], session_summary: str | None) -> str:
+    """Hash of conversation history — same Q in different contexts should not share cache."""
+    parts = []
+    if session_summary:
+        parts.append(f"summary:{session_summary[:100]}")
+    # Include last 2 rounds of history to differentiate context
+    for m in history_messages[-4:]:
+        parts.append(f"{m.get('role','')}:{m.get('content','')[:80]}")
+    return hashlib.sha256("|".join(parts).encode()).hexdigest()[:16]
+
+
+def _make_cache_key(kb_id: int, question: str, context_hash: str, history_hash: str) -> str:
+    """Build Redis key: rag_cache:{kb_id}:{history_hash}:{context_hash}:{question_hash}"""
+    question_hash = hashlib.sha256(question.encode()).hexdigest()[:24]
+    return f"{_CACHE_KEY_PREFIX}:{kb_id}:{history_hash}:{context_hash}:{question_hash}"
+
+
+async def _cache_get(kb_id: int, question: str, context_hash: str, history_hash: str) -> tuple[str, list[dict]] | None:
+    key = _make_cache_key(kb_id, question, context_hash, history_hash)
+    data = await redis_client.get(key)
+    if data:
+        # Move to end (LRU behavior) by touching the key's TTL
+        await redis_client.expire(key, _CACHE_TTL_SECONDS)
+        parsed = json.loads(data)
+        return parsed["response"], parsed["sources"]
     return None
 
 
-def _cache_set(kb_id: int, question: str, context_hash: str, response: str, sources: list[dict]) -> None:
-    key = (kb_id, context_hash, question)
-    _response_cache[key] = (response, sources)
-    _response_cache.move_to_end(key)
-    while len(_response_cache) > _CACHE_MAX_SIZE:
-        _response_cache.popitem(last=False)
+async def _cache_set(kb_id: int, question: str, context_hash: str, history_hash: str, response: str, sources: list[dict]) -> None:
+    key = _make_cache_key(kb_id, question, context_hash, history_hash)
+    data = json.dumps({"response": response, "sources": sources})
+    await redis_client.setex(key, _CACHE_TTL_SECONDS, data)
 
 
-async def retrieve_chunks(kb_id: int, query: str, top_k: int = 5) -> list[dict]:
+async def retrieve_chunks(kb_id: int, query: str, top_k: int = 5, score_threshold: float = 0.5) -> list[dict]:
     """从 Chroma 检索最相关的文本片段（运行在受限线程池避免阻塞事件循环）"""
     query_embedding = await get_embedding(query)
     collection = get_collection(kb_id)
@@ -71,12 +89,15 @@ async def retrieve_chunks(kb_id: int, query: str, top_k: int = 5) -> list[dict]:
             results["metadatas"][0],
             results["distances"][0],
         ):
+            score = 1 - dist  # cosine distance -> similarity
+            if score < score_threshold:
+                continue
             chunks.append({
                 "text": doc,
                 "filename": meta.get("filename", "未知文件"),
                 "chunk_index": meta.get("chunk_index", 0),
                 "document_id": meta.get("document_id"),
-                "score": 1 - dist,  # cosine distance -> similarity
+                "score": score,
             })
     return chunks
 
@@ -86,6 +107,8 @@ async def rag_chat_stream(
     session_summary: str | None,
     history_messages: list[dict],
     user_question: str,
+    top_k: int = 5,
+    score_threshold: float = 0.5,
 ) -> AsyncGenerator[tuple[str, list[dict]], None]:
     """
     RAG 问答流式生成器
@@ -106,7 +129,7 @@ async def rag_chat_stream(
     messages_for_llm.extend(recent)
 
     # 检索
-    chunks = await retrieve_chunks(kb_id, user_question, top_k=5)
+    chunks = await retrieve_chunks(kb_id, user_question, top_k=top_k, score_threshold=score_threshold)
 
     context_parts = []
     sources = []
@@ -124,9 +147,20 @@ async def rag_chat_stream(
 
     context = "\n\n---\n\n".join(context_parts) if context_parts else "（暂无相关参考资料）"
 
-    # Check cache (cache key includes context hash so same Q + same docs = hit)
+    # Short-circuit: no relevant chunks — return canned response without calling LLM
+    if not chunks:
+        no_result = "抱歉，知识库中没有找到与您问题相关的内容，建议您尝试换一种表述方式，或上传更多相关文档。"
+        for i in range(0, len(no_result), 50):
+            yield no_result[i:i+50], []
+        yield "", []
+        return
+
+    # Compute cache key including history context
     context_hash = _make_context_hash(chunks)
-    cached = _cache_get(kb_id, user_question, context_hash)
+    history_hash = _make_history_hash(history_messages, session_summary)
+
+    # Check cache (cache key includes context hash so same Q + same docs = hit)
+    cached = await _cache_get(kb_id, user_question, context_hash, history_hash)
     if cached:
         logger.debug(f"Cache hit for kb={kb_id} question={user_question[:30]}")
         cached_response, cached_sources = cached
@@ -150,7 +184,7 @@ async def rag_chat_stream(
 
     # Cache the complete response
     final_response = "".join(full_response)
-    _cache_set(kb_id, user_question, context_hash, final_response, sources)
+    await _cache_set(kb_id, user_question, context_hash, history_hash, final_response, sources)
 
     # 最后 yield sources
     yield "", sources

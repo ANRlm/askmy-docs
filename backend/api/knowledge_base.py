@@ -16,11 +16,15 @@ router = APIRouter(prefix="/api/kb", tags=["知识库管理"])
 class CreateKBRequest(BaseModel):
     name: str
     description: str = ""
+    top_k: int = 5
+    score_threshold: float = 0.5
 
 
 class UpdateKBRequest(BaseModel):
     name: str | None = None
     description: str | None = None
+    top_k: int | None = None
+    score_threshold: float | None = None
 
 
 @router.post("", summary="创建知识库")
@@ -31,11 +35,24 @@ async def create_knowledge_base(
     db: AsyncSession = Depends(get_db),
 ):
     await check_rate_limit(request, current_user.id)
-    kb = KnowledgeBase(user_id=current_user.id, name=body.name, description=body.description)
+    kb = KnowledgeBase(
+        user_id=current_user.id,
+        name=body.name,
+        description=body.description,
+        top_k=body.top_k,
+        score_threshold=body.score_threshold,
+    )
     db.add(kb)
     await db.commit()
     await db.refresh(kb)
-    return {"id": kb.id, "name": kb.name, "description": kb.description, "created_at": kb.created_at}
+    return {
+        "id": kb.id,
+        "name": kb.name,
+        "description": kb.description,
+        "top_k": kb.top_k,
+        "score_threshold": kb.score_threshold,
+        "created_at": kb.created_at,
+    }
 
 
 @router.get("", summary="列出知识库")
@@ -49,7 +66,17 @@ async def list_knowledge_bases(
         select(KnowledgeBase).where(KnowledgeBase.user_id == current_user.id)
     )
     kbs = result.scalars().all()
-    return [{"id": k.id, "name": k.name, "description": k.description, "created_at": k.created_at} for k in kbs]
+    return [
+        {
+            "id": k.id,
+            "name": k.name,
+            "description": k.description,
+            "top_k": k.top_k,
+            "score_threshold": k.score_threshold,
+            "created_at": k.created_at,
+        }
+        for k in kbs
+    ]
 
 
 @router.patch("/{kb_id}", summary="更新知识库")
@@ -72,9 +99,20 @@ async def update_knowledge_base(
         kb.name = body.name
     if body.description is not None:
         kb.description = body.description
+    if body.top_k is not None:
+        kb.top_k = body.top_k
+    if body.score_threshold is not None:
+        kb.score_threshold = body.score_threshold
     await db.commit()
     await db.refresh(kb)
-    return {"id": kb.id, "name": kb.name, "description": kb.description, "created_at": kb.created_at}
+    return {
+        "id": kb.id,
+        "name": kb.name,
+        "description": kb.description,
+        "top_k": kb.top_k,
+        "score_threshold": kb.score_threshold,
+        "created_at": kb.created_at,
+    }
 
 
 @router.delete("/{kb_id}", summary="删除知识库")

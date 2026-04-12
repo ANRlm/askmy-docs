@@ -16,7 +16,8 @@ from loguru import logger
 
 router = APIRouter(tags=["文档管理"])
 
-ALLOWED_EXTENSIONS = {".pdf", ".md", ".txt"}
+ALLOWED_EXTENSIONS = {".pdf", ".md", ".txt", ".docx", ".xlsx", ".xls", ".csv", ".html", ".htm"}
+MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB
 
 
 def _write_file(path: str, content: bytes) -> None:
@@ -50,14 +51,18 @@ async def upload_document(
     # 验证文件类型
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=400, detail=f"不支持的文件类型，仅支持: {', '.join(ALLOWED_EXTENSIONS)}")
+        raise HTTPException(status_code=400, detail=f"不支持的文件类型，仅支持: {', '.join(sorted(ALLOWED_EXTENSIONS))}")
+
+    # 读取内容并检查大小
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(status_code=413, detail=f"文件大小超过 {MAX_FILE_SIZE_BYTES // (1024*1024)} MB 限制")
 
     # 存储文件
     os.makedirs(settings.file_storage_path, exist_ok=True)
     unique_name = f"{uuid.uuid4()}{ext}"
     file_path = os.path.join(settings.file_storage_path, unique_name)
 
-    content = await file.read()
     await asyncio.to_thread(_write_file, file_path, content)
 
     # 创建文档记录
@@ -153,6 +158,56 @@ async def get_document(
     doc = result.scalar_one_or_none()
     if not doc:
         raise HTTPException(status_code=404, detail="文档不存在")
+
+    return {
+        "id": doc.id,
+        "filename": doc.filename,
+        "status": doc.status,
+        "chunk_count": doc.chunk_count,
+        "error_msg": doc.error_msg,
+        "created_at": doc.created_at,
+    }
+
+
+@router.post("/api/kb/{kb_id}/documents/{doc_id}/retry", summary="重新处理文档")
+async def retry_document(
+    kb_id: int,
+    doc_id: int,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await check_rate_limit(request, current_user.id)
+    result = await db.execute(
+        select(Document).where(
+            Document.id == doc_id,
+            Document.kb_id == kb_id,
+            Document.user_id == current_user.id,
+        )
+    )
+    doc = result.scalar_one_or_none()
+    if not doc:
+        raise HTTPException(status_code=404, detail="文档不存在")
+
+    if doc.status != "failed":
+        raise HTTPException(status_code=400, detail="只能重试处理失败的文档")
+
+    doc.status = "pending"
+    doc.error_msg = None
+    await db.commit()
+
+    try:
+        queue = get_rq_queue()
+        queue.enqueue(
+            "tasks.document_task.process_document",
+            doc.id,
+            job_timeout=600,
+        )
+    except Exception as e:
+        logger.error(f"任务队列提交失败: {e}")
+        doc.status = "failed"
+        doc.error_msg = "任务队列不可用"
+        await db.commit()
 
     return {
         "id": doc.id,

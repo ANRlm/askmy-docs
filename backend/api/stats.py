@@ -36,6 +36,13 @@ async def submit_feedback(
     if not msg:
         raise HTTPException(status_code=404, detail="消息不存在")
 
+    # IDOR 校验：验证消息所属的会话属于当前用户
+    result = await db.execute(
+        select(Session).where(Session.id == msg.session_id, Session.user_id == current_user.id)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="消息不存在")
+
     # 检查是否已评价，若有则更新
     result = await db.execute(
         select(Feedback).where(Feedback.message_id == message_id, Feedback.user_id == current_user.id)
@@ -142,6 +149,13 @@ async def get_message_sources(
     result = await db.execute(select(Message).where(Message.id == message_id))
     msg = result.scalar_one_or_none()
     if not msg:
+        raise HTTPException(status_code=404, detail="消息不存在")
+
+    # IDOR 校验：验证消息所属的会话属于当前用户
+    result = await db.execute(
+        select(Session).where(Session.id == msg.session_id, Session.user_id == current_user.id)
+    )
+    if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="消息不存在")
 
     result = await db.execute(

@@ -6,7 +6,7 @@ from database import get_db
 from models.user import User
 from models.api_key import ApiKey
 from middleware.auth import get_current_user
-from middleware.rate_limit import check_rate_limit
+from middleware.rate_limit import check_rate_limit, check_ip_rate_limit
 from utils.security import (
     hash_password, verify_password, create_jwt_token,
     generate_api_key, hash_api_key,
@@ -31,7 +31,10 @@ class CreateApiKeyRequest(BaseModel):
 
 
 @router.post("/register", summary="用户注册")
-async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(body: RegisterRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    await check_ip_rate_limit(request, limit=5, window=60)
+    if len(body.password) < 8:
+        raise HTTPException(status_code=400, detail="密码长度至少 8 个字符")
     result = await db.execute(select(User).where(User.email == body.email))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="邮箱已注册")
@@ -44,7 +47,8 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/login", summary="用户登录")
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    await check_ip_rate_limit(request, limit=10, window=60)
     result = await db.execute(select(User).where(User.email == body.email))
     user = result.scalar_one_or_none()
     if not user or not verify_password(body.password, user.hashed_password):

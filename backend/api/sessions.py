@@ -144,6 +144,14 @@ async def chat(
     if not session:
         raise HTTPException(status_code=404, detail="会话不存在")
 
+    # Fetch KB-level RAG params
+    kb_result = await db.execute(
+        select(KnowledgeBase.top_k, KnowledgeBase.score_threshold).where(KnowledgeBase.id == session.kb_id)
+    )
+    kb_row = kb_result.first()
+    top_k = kb_row.top_k if kb_row else 5
+    score_threshold = kb_row.score_threshold if kb_row else 0.5
+
     # 获取历史消息（只取最近 20 条用于上下文，压缩判断用计数）
     from sqlalchemy import func
     msg_count_result = await db.execute(
@@ -151,7 +159,7 @@ async def chat(
     )
     total_msg_count = msg_count_result.scalar() or 0
 
-    # Only load last 20 messages for LLM context instead of all
+    # Only load last 20 messages for LLM context
     recent_result = await db.execute(
         select(Message)
         .where(Message.session_id == session_id)
@@ -161,14 +169,6 @@ async def chat(
     recent_messages = recent_result.scalars().all()
     # Preserve chronological order for the LLM
     history = [{"role": m.role, "content": m.content} for m in reversed(list(recent_messages))]
-    history_count_for_compress = total_msg_count
-
-    # Full history for compression (needed since we only keep last 20 for LLM context)
-    all_history_result = await db.execute(
-        select(Message).where(Message.session_id == session_id).order_by(Message.created_at)
-    )
-    all_history_messages = all_history_result.scalars().all()
-    full_history = [{"role": m.role, "content": m.content} for m in all_history_messages]
 
     # 保存用户消息
     user_msg = Message(session_id=session_id, role="user", content=body.message)
@@ -179,24 +179,30 @@ async def chat(
     start_time = time.time()
 
     # 记忆压缩改为后台异步执行，不阻塞流式响应
-    # history_count_for_compress: total_msg_count includes new user msg, subtract 1
-    rounds_before_new = (history_count_for_compress - 1) // 2
+    # total_msg_count includes new user msg, subtract 1 to get rounds before new message
+    rounds_before_new = (total_msg_count - 1) // 2
     should_compress = rounds_before_new > 10
     if should_compress:
         logger.info(f"会话 {session_id} 触发记忆压缩（后台异步执行）")
 
         async def compress_and_save():
             from database import AsyncSessionLocal
-            from sqlalchemy import update
+            from sqlalchemy import update, select
             from models.session import Session as SessionModel
+            from models.message import Message
             # Cancel any prior compression task for this session
             if session_id in _active_compression_tasks:
                 _active_compression_tasks[session_id].cancel()
             task = asyncio.current_task()
             _active_compression_tasks[session_id] = task
             try:
-                # Use a fresh DB session to avoid relying on the request-scoped one
                 async with AsyncSessionLocal() as db_compress:
+                    # Load full history lazily — only when compression is triggered
+                    result = await db_compress.execute(
+                        select(Message).where(Message.session_id == session_id).order_by(Message.created_at)
+                    )
+                    all_messages = result.scalars().all()
+                    full_history = [{"role": m.role, "content": m.content} for m in all_messages]
                     new_summary = await get_new_summary(session.summary, full_history)
                     await db_compress.execute(
                         update(SessionModel)
@@ -224,6 +230,8 @@ async def chat(
                 session_summary=session.summary,
                 history_messages=history,
                 user_question=body.message,
+                top_k=top_k,
+                score_threshold=score_threshold,
             ):
                 if text_chunk:
                     full_response.append(text_chunk)
@@ -328,6 +336,14 @@ async def retrace_chat(
     if not session:
         raise HTTPException(status_code=404, detail="会话不存在")
 
+    # Fetch KB-level RAG params
+    kb_result = await db.execute(
+        select(KnowledgeBase.top_k, KnowledgeBase.score_threshold).where(KnowledgeBase.id == session.kb_id)
+    )
+    kb_row = kb_result.first()
+    top_k = kb_row.top_k if kb_row else 5
+    score_threshold = kb_row.score_threshold if kb_row else 0.5
+
     # 找到目标用户消息，确认它属于该会话且 role=user
     result = await db.execute(
         select(Message).where(Message.id == body.message_id, Message.session_id == session_id)
@@ -376,6 +392,8 @@ async def retrace_chat(
                 session_summary=None,
                 history_messages=history,
                 user_question=new_content,
+                top_k=top_k,
+                score_threshold=score_threshold,
             ):
                 if text_chunk:
                     full_response.append(text_chunk)

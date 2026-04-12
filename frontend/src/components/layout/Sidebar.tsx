@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react'
 import {
   Plus, Trash2, FolderOpen, MessageSquare, ChevronDown, ChevronRight,
-  BookOpen, LogOut, Settings, Search, X,
+  BookOpen, LogOut, Settings, Search, X, Files, Sliders,
 } from 'lucide-react'
 import * as api from '../../api'
 import type { KnowledgeBase, Session } from '../../types'
 import { useAuth } from '../../hooks/useAuth'
 import DocumentModal from '../kb/DocumentModal'
+import KbSettingsModal from '../kb/KbSettingsModal'
 
 interface Props {
   selectedKb: KnowledgeBase | null
@@ -18,17 +19,19 @@ interface Props {
   onNewSession: (session: Session) => void
   onSessionRenamed?: (session: Session) => void
   onKbDeleted?: (kbId: number) => void
+  onKbUpdated?: (kb: KnowledgeBase) => void
 }
 
 export default function Sidebar({
   selectedKb, selectedSession, collapsed, onToggleCollapse,
-  onSelectKb, onSelectSession, onNewSession, onSessionRenamed, onKbDeleted,
+  onSelectKb, onSelectSession, onNewSession, onSessionRenamed, onKbDeleted, onKbUpdated,
 }: Props) {
   const { user, logout } = useAuth()
   const [kbs, setKbs] = useState<KnowledgeBase[]>([])
   const [sessionsByKb, setSessionsByKb] = useState<Map<number, Session[]>>(new Map())
   const [expandedKb, setExpandedKb] = useState<number | null>(null)
   const [docModalKb, setDocModalKb] = useState<KnowledgeBase | null>(null)
+  const [settingsModalKb, setSettingsModalKb] = useState<KnowledgeBase | null>(null)
   const [creating, setCreating] = useState(false)
   const [newKbName, setNewKbName] = useState('')
   const [newKbDesc, setNewKbDesc] = useState('')
@@ -342,7 +345,15 @@ export default function Sidebar({
                     style={{ color: 'var(--text-tertiary)' }}
                     aria-label="管理文档"
                   >
-                    <Settings className="w-3 h-3" />
+                    <Files className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setSettingsModalKb(kb) }}
+                    className="interactive-icon p-1 rounded-md"
+                    style={{ color: 'var(--text-tertiary)' }}
+                    aria-label="知识库设置"
+                  >
+                    <Sliders className="w-3 h-3" />
                   </button>
                   <button
                     onClick={(e) => handleDeleteKb(e, kb.id)}
@@ -473,6 +484,16 @@ export default function Sidebar({
 
       {docModalKb && (
         <DocumentModal kb={docModalKb} onClose={() => setDocModalKb(null)} />
+      )}
+      {settingsModalKb && (
+        <KbSettingsModal
+          kb={settingsModalKb}
+          onClose={() => setSettingsModalKb(null)}
+          onUpdated={(updated) => {
+            setKbs((prev) => prev.map((k) => k.id === updated.id ? updated : k))
+            onKbUpdated?.(updated)
+          }}
+        />
       )}
     </>
   )

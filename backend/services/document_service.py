@@ -1,7 +1,17 @@
 import os
 import re
+import csv
 from pathlib import Path
 from loguru import logger
+
+
+def _detect_encoding(file_path: str) -> str:
+    """自动检测文件编码"""
+    import charset_normalizer
+    with open(file_path, "rb") as f:
+        result = charset_normalizer.from_bytes(f.read())
+    best = result.best()
+    return best.encoding if best else "utf-8"
 
 
 def extract_text_from_pdf(file_path: str) -> str:
@@ -15,12 +25,77 @@ def extract_text_from_pdf(file_path: str) -> str:
     return "\n\n".join(texts)
 
 
+def extract_text_from_docx(file_path: str) -> str:
+    from docx import Document
+    doc = Document(file_path)
+    paragraphs = []
+    for para in doc.paragraphs:
+        if para.text.strip():
+            paragraphs.append(para.text.strip())
+    # 提取表格内容
+    for table in doc.tables:
+        for row in table.rows:
+            cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+            if cells:
+                paragraphs.append(" | ".join(cells))
+    return "\n\n".join(paragraphs)
+
+
+def extract_text_from_xlsx(file_path: str) -> str:
+    import openpyxl
+    wb = openpyxl.load_workbook(file_path, data_only=True)
+    parts = []
+    for sheet_name in wb.sheetnames:
+        sheet = wb[sheet_name]
+        parts.append(f"[{sheet_name}]")
+        for row in sheet.iter_rows(values_only=True):
+            cells = [str(c) for c in row if c is not None]
+            if cells:
+                parts.append(" | ".join(cells))
+    return "\n".join(parts)
+
+
+def extract_text_from_csv(file_path: str) -> str:
+    encoding = _detect_encoding(file_path)
+    parts = []
+    with open(file_path, "r", encoding=encoding, errors="replace") as f:
+        reader = csv.reader(f)
+        for row in reader:
+            cells = [c.strip() for c in row if c.strip()]
+            if cells:
+                parts.append(" | ".join(cells))
+    return "\n".join(parts)
+
+
+def extract_text_from_html(file_path: str) -> str:
+    from bs4 import BeautifulSoup
+    encoding = _detect_encoding(file_path)
+    with open(file_path, "r", encoding=encoding, errors="replace") as f:
+        soup = BeautifulSoup(f.read(), "html.parser")
+    # 移除 script 和 style 元素
+    for tag in soup(["script", "style", "nav", "footer", "header"]):
+        tag.decompose()
+    text = soup.get_text(separator="\n", strip=True)
+    # 合并空行
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    return "\n\n".join(lines)
+
+
 def extract_text_from_file(file_path: str, filename: str) -> str:
     ext = Path(filename).suffix.lower()
     if ext == ".pdf":
         return extract_text_from_pdf(file_path)
+    elif ext == ".docx":
+        return extract_text_from_docx(file_path)
+    elif ext in {".xlsx", ".xls"}:
+        return extract_text_from_xlsx(file_path)
+    elif ext == ".csv":
+        return extract_text_from_csv(file_path)
+    elif ext in {".html", ".htm"}:
+        return extract_text_from_html(file_path)
     else:
-        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+        encoding = _detect_encoding(file_path)
+        with open(file_path, "r", encoding=encoding, errors="replace") as f:
             return f.read()
 
 

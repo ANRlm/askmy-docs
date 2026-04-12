@@ -27,6 +27,10 @@ function AppInner() {
 
   // Messages stored per session — switching sessions preserves in-progress streams
   const [messagesBySession, setMessagesBySession] = useState<Map<number, Message[]>>(new Map())
+  // Tracks which sessions have been loaded (stable ref, not state)
+  const loadedSessionsRef = useRef<Set<number>>(new Set())
+  // Tracks which sessions are currently loading history
+  const [loadingSessions, setLoadingSessions] = useState<Set<number>>(new Set())
   // Tracks which sessions have an in-progress stream
   const [streamingSessions, setStreamingSessions] = useState<Set<number>>(new Set())
 
@@ -204,7 +208,9 @@ function AppInner() {
 
   // Load history into the Map for a given session
   const loadHistory = useCallback((sessionId: number) => {
-    if (messagesBySession.has(sessionId)) return
+    if (loadedSessionsRef.current.has(sessionId)) return
+    loadedSessionsRef.current.add(sessionId)
+    setLoadingSessions((prev) => new Set(prev).add(sessionId))
     api.getMessages(sessionId).then((msgs) => {
       setMessagesBySession((prev) => {
         const next = new Map(prev)
@@ -219,7 +225,8 @@ function AppInner() {
         return next
       })
     }).catch(() => {})
-  }, [messagesBySession])
+    .finally(() => setLoadingSessions((prev) => { const n = new Set(prev); n.delete(sessionId); return n }))
+  }, [])
 
   useEffect(() => {
     if (selectedSession) loadHistory(selectedSession.id)
@@ -369,6 +376,7 @@ function AppInner() {
 
   const currentMessages = selectedSession ? (messagesBySession.get(selectedSession.id) ?? []) : []
   const isStreaming = selectedSession ? streamingSessions.has(selectedSession.id) : false
+  const isLoadingMessages = selectedSession ? loadingSessions.has(selectedSession.id) : false
 
   return (
     <div className="h-screen flex overflow-hidden" style={{ background: 'var(--bg-base)' }}>
@@ -382,6 +390,7 @@ function AppInner() {
         onNewSession={handleNewSession}
         onSessionRenamed={handleSessionRenamed}
         onKbDeleted={handleKbDeleted}
+        onKbUpdated={(kb) => { if (selectedKb?.id === kb.id) setSelectedKb(kb) }}
       />
       <main className="flex-1 flex overflow-hidden">
         <ChatArea
@@ -389,6 +398,7 @@ function AppInner() {
           session={selectedSession}
           messages={currentMessages}
           isStreaming={isStreaming}
+          isLoadingMessages={isLoadingMessages}
           onSend={handleSend}
           onStop={handleStop}
           onRetrace={handleRetrace}

@@ -9,6 +9,8 @@ export interface KnowledgeBase {
   id: number
   name: string
   description: string
+  top_k: number
+  score_threshold: number
   created_at: string
 }
 
@@ -43,6 +45,7 @@ export interface Message {
   sources?: Source[]
   response_time?: number
   streaming?: boolean
+  created_at?: string  // ISO timestamp from backend
 }
 
 export interface AuthTokens {
