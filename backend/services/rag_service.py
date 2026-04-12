@@ -1,3 +1,4 @@
+import asyncio
 import time
 from typing import AsyncGenerator
 from chroma_client import get_collection
@@ -18,10 +19,12 @@ KEEP_RECENT_ROUNDS = 3
 
 
 async def retrieve_chunks(kb_id: int, query: str, top_k: int = 5) -> list[dict]:
-    """从 Chroma 检索最相关的文本片段"""
+    """从 Chroma 检索最相关的文本片段（运行在线程池避免阻塞事件循环）"""
     query_embedding = await get_embedding(query)
     collection = get_collection(kb_id)
-    results = collection.query(
+    # chromadb 的 HttpClient 是同步的，必须在线程中执行避免阻塞事件循环
+    results = await asyncio.to_thread(
+        collection.query,
         query_embeddings=[query_embedding],
         n_results=top_k,
         include=["documents", "metadatas", "distances"],

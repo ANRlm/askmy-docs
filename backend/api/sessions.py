@@ -1,3 +1,4 @@
+import asyncio
 import json
 import time
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -139,13 +140,6 @@ async def chat(
     all_messages = result.scalars().all()
     history = [{"role": m.role, "content": m.content} for m in all_messages]
 
-    # 判断是否需要记忆压缩
-    if await should_compress_history(history):
-        logger.info(f"会话 {session_id} 触发记忆压缩")
-        new_summary = await get_new_summary(session.summary, history)
-        session.summary = new_summary
-        await db.commit()
-
     # 保存用户消息
     user_msg = Message(session_id=session_id, role="user", content=body.message)
     db.add(user_msg)
@@ -153,6 +147,26 @@ async def chat(
     await db.refresh(user_msg)
 
     start_time = time.time()
+
+    # 记忆压缩改为后台异步执行，不阻塞流式响应
+    if await should_compress_history(history):
+        logger.info(f"会话 {session_id} 触发记忆压缩（后台异步执行）")
+
+        async def compress_and_save():
+            try:
+                new_summary = await get_new_summary(session.summary, history)
+                from sqlalchemy import update
+                from models.session import Session as SessionModel
+                await db.execute(
+                    update(SessionModel)
+                    .where(SessionModel.id == session_id)
+                    .values(summary=new_summary)
+                )
+                await db.commit()
+            except Exception as e:
+                logger.error(f"后台记忆压缩失败: {e}")
+
+        asyncio.create_task(compress_and_save())
 
     async def event_generator():
         full_response = []
@@ -176,11 +190,10 @@ async def chat(
             yield f"data: {json.dumps({'type': 'error', 'content': '生成回答时发生错误'}, ensure_ascii=False)}\n\n"
             return
 
-        # 保存 assistant 回答
+        # 保存 assistant 回答 + 检索日志（一次事务，一次提交）
         response_time = time.time() - start_time
         assistant_content = "".join(full_response)
 
-        # 格式化 sources
         sources_data = [
             {
                 "filename": s["filename"],
@@ -200,25 +213,25 @@ async def chat(
                 response_time=response_time,
             )
             db.add(assistant_msg)
+            await db.flush()  # 获取 assistant_msg.id（不提交事务）
+            # 批量保存检索日志
+            db.add_all([
+                RetrievalLog(
+                    message_id=assistant_msg.id,
+                    document_id=int(s["document_id"]) if s.get("document_id") else None,
+                    chunk_index=s["chunk_index"],
+                    chunk_text=s["text"][:1000],
+                    score=s["score"],
+                )
+                for s in sources
+            ])
+        # 事务自动提交
 
-        await db.commit()
-        await db.refresh(assistant_msg)
-
-        # 保存检索日志
-        for s in sources:
-            log = RetrievalLog(
-                message_id=assistant_msg.id,
-                document_id=int(s["document_id"]) if s.get("document_id") else None,
-                chunk_index=s["chunk_index"],
-                chunk_text=s["text"][:1000],
-                score=s["score"],
-            )
-            db.add(log)
-        await db.commit()
+        assistant_msg_id = assistant_msg.id
 
         # 发送 sources 事件
         yield f"data: {json.dumps({'type': 'sources', 'content': sources_data}, ensure_ascii=False)}\n\n"
-        yield f"data: {json.dumps({'type': 'done', 'message_id': assistant_msg.id}, ensure_ascii=False)}\n\n"
+        yield f"data: {json.dumps({'type': 'done', 'message_id': assistant_msg_id}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
         event_generator(),
@@ -346,24 +359,23 @@ async def retrace_chat(
                 response_time=response_time,
             )
             db.add(assistant_msg)
+            await db.flush()
+            db.add_all([
+                RetrievalLog(
+                    message_id=assistant_msg.id,
+                    document_id=int(s["document_id"]) if s.get("document_id") else None,
+                    chunk_index=s["chunk_index"],
+                    chunk_text=s["text"][:1000],
+                    score=s["score"],
+                )
+                for s in sources
+            ])
 
-        await db.commit()
-        await db.refresh(assistant_msg)
-
-        for s in sources:
-            log = RetrievalLog(
-                message_id=assistant_msg.id,
-                document_id=int(s["document_id"]) if s.get("document_id") else None,
-                chunk_index=s["chunk_index"],
-                chunk_text=s["text"][:1000],
-                score=s["score"],
-            )
-            db.add(log)
-        await db.commit()
+        assistant_msg_id = assistant_msg.id
 
         yield f"data: {json.dumps({'type': 'user_msg_id', 'message_id': user_msg.id}, ensure_ascii=False)}\n\n"
         yield f"data: {json.dumps({'type': 'sources', 'content': sources_data}, ensure_ascii=False)}\n\n"
-        yield f"data: {json.dumps({'type': 'done', 'message_id': assistant_msg.id}, ensure_ascii=False)}\n\n"
+        yield f"data: {json.dumps({'type': 'done', 'message_id': assistant_msg_id}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
         event_generator(),
