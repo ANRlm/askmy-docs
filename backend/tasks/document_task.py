@@ -16,6 +16,8 @@ async def _process_document_async(document_id: int):
     from sqlalchemy import select
     from config import settings
     from models.document import Document
+    from models.knowledge_base import KnowledgeBase  # noqa: F401 — 必须导入以注册外键关联
+    from models.user import User  # noqa: F401
     from services.document_service import extract_text_from_file, split_into_chunks
     from services.embedding_service import get_embeddings
     from chroma_client import get_collection
@@ -50,8 +52,8 @@ async def _process_document_async(document_id: int):
             chunks = split_into_chunks(text, chunk_size=500, overlap=50)
             logger.info(f"文档 {doc.filename} 分块完成，共 {len(chunks)} 块")
 
-            # 批量生成 Embedding（每批最多 20 条）
-            batch_size = 20
+            # 批量生成 Embedding（阿里百炼每批最多 10 条）
+            batch_size = 10
             all_embeddings = []
             for i in range(0, len(chunks), batch_size):
                 batch = chunks[i:i + batch_size]
@@ -90,7 +92,7 @@ async def _process_document_async(document_id: int):
             logger.info(f"文档 {doc.filename} 处理完成，写入 {len(chunks)} 个向量")
 
         except Exception as e:
-            logger.error(f"文档 {document_id} 处理失败: {e}", exc_info=True)
+            logger.error("文档 {} 处理失败: {}", document_id, e, exc_info=True)
             try:
                 result = await db.execute(select(Document).where(Document.id == document_id))
                 doc = result.scalar_one_or_none()

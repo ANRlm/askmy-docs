@@ -17,7 +17,7 @@ interface Props {
 export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSelectSession, onNewSession, onSessionRenamed }: Props) {
   const { user, logout } = useAuth()
   const [kbs, setKbs] = useState<KnowledgeBase[]>([])
-  const [sessions, setSessions] = useState<Session[]>([])
+  const [sessionsByKb, setSessionsByKb] = useState<Map<number, Session[]>>(new Map())
   const [expandedKb, setExpandedKb] = useState<number | null>(null)
   const [docModalKb, setDocModalKb] = useState<KnowledgeBase | null>(null)
   const [creating, setCreating] = useState(false)
@@ -40,7 +40,7 @@ export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSel
   const loadSessions = async (kbId: number) => {
     try {
       const data = await api.listSessions(kbId)
-      setSessions(data)
+      setSessionsByKb((prev) => new Map(prev).set(kbId, data))
     } catch {}
   }
 
@@ -66,17 +66,25 @@ export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSel
   const handleNewSession = async (kb: KnowledgeBase) => {
     try {
       const session = await api.createSession(kb.id)
-      setSessions((prev) => [session, ...prev])
+      setSessionsByKb((prev) => {
+        const next = new Map(prev)
+        next.set(kb.id, [session, ...(next.get(kb.id) ?? [])])
+        return next
+      })
       onNewSession(session)
     } catch {}
   }
 
-  const handleDeleteSession = async (e: React.MouseEvent, sessionId: number) => {
+  const handleDeleteSession = async (e: React.MouseEvent, sessionId: number, kbId: number) => {
     e.stopPropagation()
     if (!confirm('确定删除此会话？')) return
     try {
       await api.deleteSession(sessionId)
-      setSessions((prev) => prev.filter((s) => s.id !== sessionId))
+      setSessionsByKb((prev) => {
+        const next = new Map(prev)
+        next.set(kbId, (next.get(kbId) ?? []).filter((s) => s.id !== sessionId))
+        return next
+      })
     } catch {}
   }
 
@@ -95,7 +103,19 @@ export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSel
     }
     try {
       const updated = await api.renameSession(sessionId, trimmed)
-      setSessions((prev) => prev.map((s) => s.id === sessionId ? { ...s, title: updated.title } : s))
+      setSessionsByKb((prev) => {
+        const next = new Map(prev)
+        for (const [kbId, list] of next) {
+          const idx = list.findIndex((s) => s.id === sessionId)
+          if (idx !== -1) {
+            const newList = [...list]
+            newList[idx] = { ...newList[idx], title: updated.title }
+            next.set(kbId, newList)
+            break
+          }
+        }
+        return next
+      })
       onSessionRenamed?.(updated)
     } catch {}
     setRenamingSessionId(null)
@@ -205,7 +225,7 @@ export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSel
               ? kbs.filter(
                   (kb) =>
                     kb.name.toLowerCase().includes(q) ||
-                    sessions.some((s) => s.kb_id === kb.id && s.title.toLowerCase().includes(q))
+                    (sessionsByKb.get(kb.id) ?? []).some((s) => s.title.toLowerCase().includes(q))
                 )
               : kbs
             return filteredKbs.map((kb) => (
@@ -252,10 +272,10 @@ export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSel
                     <Plus className="w-3 h-3" />
                     <span>新建会话</span>
                   </button>
-                  {sessions
+                  {(sessionsByKb.get(kb.id) ?? [])
                     .filter((s) => {
                       const q = searchQuery.trim().toLowerCase()
-                      return s.kb_id === kb.id && (!q || s.title.toLowerCase().includes(q))
+                      return !q || s.title.toLowerCase().includes(q)
                     })
                     .map((session) => (
                       <div
@@ -283,7 +303,7 @@ export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSel
                           <span className="flex-1 text-[12px] truncate" title="双击重命名">{session.title}</span>
                         )}
                         <button
-                          onClick={(e) => handleDeleteSession(e, session.id)}
+                          onClick={(e) => handleDeleteSession(e, session.id, kb.id)}
                           className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-red-500/15 hover:text-red-400 text-white/30 transition-colors shrink-0"
                         >
                           <Trash2 className="w-3 h-3" />
