@@ -16,12 +16,13 @@ const statusLabel: Record<Document['status'], string> = {
 }
 
 function StatusBadge({ status }: { status: Document['status'] }) {
-  const config = {
-    done: { color: 'var(--success)', bg: 'var(--success-bg)', icon: <CheckCircle className="w-3 h-3" /> },
-    failed: { color: 'var(--error)', bg: 'var(--error-bg)', icon: <AlertCircle className="w-3 h-3" /> },
-    processing: { color: 'var(--info)', bg: 'var(--info-bg)', icon: <RefreshCw className="w-3 h-3 animate-spin" /> },
-    pending: { color: 'var(--warning)', bg: 'var(--warning-bg)', icon: <Clock className="w-3 h-3" /> },
-  }[status]
+  const configs: Record<string, { color: string; bg: string; icon: React.ReactNode }> = {
+    done:       { color: 'var(--success)', bg: 'var(--success-bg)', icon: <CheckCircle className="w-3 h-3" /> },
+    failed:     { color: 'var(--error)',   bg: 'var(--error-bg)',   icon: <AlertCircle className="w-3 h-3" /> },
+    processing: { color: 'var(--info)',    bg: 'var(--info-bg)',    icon: <RefreshCw className="w-3 h-3 animate-spin" /> },
+    pending:    { color: 'var(--warning)', bg: 'var(--warning-bg)', icon: <Clock className="w-3 h-3" /> },
+  }
+  const config = configs[status] ?? configs.pending
 
   return (
     <span
@@ -29,7 +30,7 @@ function StatusBadge({ status }: { status: Document['status'] }) {
       style={{ color: config.color, background: config.bg }}
     >
       {config.icon}
-      {statusLabel[status]}
+      {statusLabel[status] ?? status}
     </span>
   )
 }
@@ -40,23 +41,47 @@ export default function DocumentModal({ kb, onClose }: Props) {
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Track whether the component is still mounted to prevent setState after unmount
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current)
+        pollingRef.current = null
+      }
+    }
+  }, [])
 
   const load = async () => {
-    try { setDocs(await api.listDocuments(kb.id)) }
-    catch (e: any) { setError(e.message) }
+    try {
+      const data = await api.listDocuments(kb.id)
+      if (mountedRef.current) setDocs(data)
+    } catch (e: any) {
+      if (mountedRef.current) setError(e.message)
+    }
+  }
+
+  const stopPolling = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current)
+      pollingRef.current = null
+    }
   }
 
   const startPolling = () => {
-    if (pollingRef.current) return
+    // Always clear any existing interval before starting a new one
+    stopPolling()
     pollingRef.current = setInterval(async () => {
+      if (!mountedRef.current) { stopPolling(); return }
       const data = await api.listDocuments(kb.id).catch(() => null)
+      if (!mountedRef.current) { stopPolling(); return }
       if (data) {
         setDocs(data)
         const hasPending = data.some((d) => d.status === 'pending' || d.status === 'processing')
-        if (!hasPending && pollingRef.current) {
-          clearInterval(pollingRef.current)
-          pollingRef.current = null
-        }
+        if (!hasPending) stopPolling()
       }
     }, 3000)
   }
@@ -64,7 +89,7 @@ export default function DocumentModal({ kb, onClose }: Props) {
   useEffect(() => {
     load()
     startPolling()
-    return () => { if (pollingRef.current) clearInterval(pollingRef.current) }
+    // Cleanup is handled by the mountedRef effect above
   }, [kb.id])
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,9 +102,9 @@ export default function DocumentModal({ kb, onClose }: Props) {
       await load()
       startPolling()
     } catch (e: any) {
-      setError(e.message)
+      if (mountedRef.current) setError(e.message)
     } finally {
-      setUploading(false)
+      if (mountedRef.current) setUploading(false)
       if (fileRef.current) fileRef.current.value = ''
     }
   }
@@ -88,9 +113,9 @@ export default function DocumentModal({ kb, onClose }: Props) {
     if (!confirm('确定删除此文档？向量数据将同步删除。')) return
     try {
       await api.deleteDocument(kb.id, docId)
-      setDocs((prev) => prev.filter((d) => d.id !== docId))
+      if (mountedRef.current) setDocs((prev) => prev.filter((d) => d.id !== docId))
     } catch (e: any) {
-      setError(e.message)
+      if (mountedRef.current) setError(e.message)
     }
   }
 
@@ -118,10 +143,7 @@ export default function DocumentModal({ kb, onClose }: Props) {
           style={{ borderBottom: '1px solid var(--border)' }}
         >
           <div>
-            <h2
-              className="text-[14px] font-semibold"
-              style={{ color: 'var(--text-primary)' }}
-            >
+            <h2 className="text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>
               {kb.name}
             </h2>
             <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
@@ -178,11 +200,7 @@ export default function DocumentModal({ kb, onClose }: Props) {
         {error && (
           <div
             className="mx-5 mt-4 px-3.5 py-2.5 rounded-xl text-[12px] animate-fade-in"
-            style={{
-              background: 'var(--error-bg)',
-              color: 'var(--error)',
-              border: '1px solid var(--error-bg)',
-            }}
+            style={{ background: 'var(--error-bg)', color: 'var(--error)', border: '1px solid var(--error-bg)' }}
           >
             {error}
           </div>
@@ -196,9 +214,7 @@ export default function DocumentModal({ kb, onClose }: Props) {
               style={{ color: 'var(--text-disabled)' }}
             >
               <FileText className="w-10 h-10 mb-3 opacity-30" />
-              <p className="text-[13px] font-medium" style={{ color: 'var(--text-tertiary)' }}>
-                暂无文档
-              </p>
+              <p className="text-[13px] font-medium" style={{ color: 'var(--text-tertiary)' }}>暂无文档</p>
               <p className="text-[11px] mt-1">点击上传按钮添加文件</p>
             </div>
           ) : (
@@ -206,19 +222,13 @@ export default function DocumentModal({ kb, onClose }: Props) {
               <div
                 key={doc.id}
                 className="flex items-center gap-3 px-3.5 py-3 rounded-xl group transition-colors"
-                style={{
-                  background: 'var(--bg-hover)',
-                  border: '1px solid var(--border)',
-                }}
+                style={{ background: 'var(--bg-hover)', border: '1px solid var(--border)' }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-active)')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
               >
                 <FileText className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-disabled)' }} />
                 <div className="flex-1 min-w-0">
-                  <p
-                    className="text-[13px] font-medium truncate"
-                    style={{ color: 'var(--text-primary)' }}
-                  >
+                  <p className="text-[13px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>
                     {doc.filename}
                   </p>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -229,10 +239,7 @@ export default function DocumentModal({ kb, onClose }: Props) {
                       </span>
                     )}
                     {doc.error_msg && (
-                      <span
-                        className="text-[10.5px] truncate max-w-[200px]"
-                        style={{ color: 'var(--error)' }}
-                      >
+                      <span className="text-[10.5px] truncate max-w-[200px]" style={{ color: 'var(--error)' }}>
                         {doc.error_msg}
                       </span>
                     )}
@@ -242,14 +249,8 @@ export default function DocumentModal({ kb, onClose }: Props) {
                   onClick={() => handleDelete(doc.id)}
                   className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all"
                   style={{ color: 'var(--text-tertiary)' }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'var(--error-bg)'
-                    e.currentTarget.style.color = 'var(--error)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent'
-                    e.currentTarget.style.color = 'var(--text-tertiary)'
-                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--error-bg)'; e.currentTarget.style.color = 'var(--error)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-tertiary)' }}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
