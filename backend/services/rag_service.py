@@ -1,5 +1,7 @@
 import asyncio
+import hashlib
 import time
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from typing import AsyncGenerator
 from chroma_client import get_collection
@@ -10,6 +12,11 @@ from loguru import logger
 
 _chroma_executor = ThreadPoolExecutor(max_workers=10)
 
+# In-memory LRU cache: keyed by (kb_id, context_hash, question) -> (response_text, sources)
+# context_hash = hash of retrieved chunks so semantically same context = cache hit
+_response_cache: OrderedDict[tuple[int, str, str], tuple[str, list[dict]]] = OrderedDict()
+_CACHE_MAX_SIZE = 500
+
 SYSTEM_PROMPT = """你是一个知识库问答助手。请根据以下参考资料回答用户的问题。
 回答时必须在末尾列出引用来源（格式：[来源：文件名，第X段]）。
 如果参考资料中没有相关内容，请明确告知用户"知识库中暂无相关信息"，不要编造答案。
@@ -19,6 +26,28 @@ SYSTEM_PROMPT = """你是一个知识库问答助手。请根据以下参考资�
 
 MAX_HISTORY_ROUNDS = 10
 KEEP_RECENT_ROUNDS = 3
+
+
+def _make_context_hash(chunks: list[dict]) -> str:
+    """Hash of retrieved chunk IDs + texts for cache key."""
+    key_parts = [f"{c.get('document_id', '')}:{c.get('chunk_index', 0)}:{c.get('text', '')[:50]}" for c in chunks]
+    return hashlib.sha256("|".join(key_parts).encode()).hexdigest()[:16]
+
+
+def _cache_get(kb_id: int, question: str, context_hash: str) -> tuple[str, list[dict]] | None:
+    key = (kb_id, context_hash, question)
+    if key in _response_cache:
+        _response_cache.move_to_end(key)
+        return _response_cache[key]
+    return None
+
+
+def _cache_set(kb_id: int, question: str, context_hash: str, response: str, sources: list[dict]) -> None:
+    key = (kb_id, context_hash, question)
+    _response_cache[key] = (response, sources)
+    _response_cache.move_to_end(key)
+    while len(_response_cache) > _CACHE_MAX_SIZE:
+        _response_cache.popitem(last=False)
 
 
 async def retrieve_chunks(kb_id: int, query: str, top_k: int = 5) -> list[dict]:
@@ -95,14 +124,33 @@ async def rag_chat_stream(
 
     context = "\n\n---\n\n".join(context_parts) if context_parts else "（暂无相关参考资料）"
 
+    # Check cache (cache key includes context hash so same Q + same docs = hit)
+    context_hash = _make_context_hash(chunks)
+    cached = _cache_get(kb_id, user_question, context_hash)
+    if cached:
+        logger.debug(f"Cache hit for kb={kb_id} question={user_question[:30]}")
+        cached_response, cached_sources = cached
+        for i in range(0, len(cached_response), 50):
+            yield cached_response[i:i+50], []
+        yield "", cached_sources
+        return
+
     system_message = {"role": "system", "content": SYSTEM_PROMPT.format(context=context)}
     user_message = {"role": "user", "content": user_question}
 
     final_messages = [system_message] + messages_for_llm + [user_message]
 
+    # Collect full response for caching
+    full_response = []
+
     # 流式生成
     async for text_chunk in chat_completion_stream(final_messages):
+        full_response.append(text_chunk)
         yield text_chunk, []
+
+    # Cache the complete response
+    final_response = "".join(full_response)
+    _cache_set(kb_id, user_question, context_hash, final_response, sources)
 
     # 最后 yield sources
     yield "", sources

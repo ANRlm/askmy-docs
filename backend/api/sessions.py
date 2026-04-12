@@ -15,7 +15,7 @@ from models.feedback import RetrievalLog
 from middleware.auth import get_current_user
 from middleware.rate_limit import check_rate_limit
 from services.rag_service import (
-    rag_chat_stream, should_compress_history, get_new_summary
+    rag_chat_stream, get_new_summary
 )
 from loguru import logger
 
@@ -144,12 +144,31 @@ async def chat(
     if not session:
         raise HTTPException(status_code=404, detail="会话不存在")
 
-    # 获取历史消息
-    result = await db.execute(
+    # 获取历史消息（只取最近 20 条用于上下文，压缩判断用计数）
+    from sqlalchemy import func
+    msg_count_result = await db.execute(
+        select(func.count()).select_from(Message).where(Message.session_id == session_id)
+    )
+    total_msg_count = msg_count_result.scalar() or 0
+
+    # Only load last 20 messages for LLM context instead of all
+    recent_result = await db.execute(
+        select(Message)
+        .where(Message.session_id == session_id)
+        .order_by(Message.created_at.desc())
+        .limit(20)
+    )
+    recent_messages = recent_result.scalars().all()
+    # Preserve chronological order for the LLM
+    history = [{"role": m.role, "content": m.content} for m in reversed(list(recent_messages))]
+    history_count_for_compress = total_msg_count
+
+    # Full history for compression (needed since we only keep last 20 for LLM context)
+    all_history_result = await db.execute(
         select(Message).where(Message.session_id == session_id).order_by(Message.created_at)
     )
-    all_messages = result.scalars().all()
-    history = [{"role": m.role, "content": m.content} for m in all_messages]
+    all_history_messages = all_history_result.scalars().all()
+    full_history = [{"role": m.role, "content": m.content} for m in all_history_messages]
 
     # 保存用户消息
     user_msg = Message(session_id=session_id, role="user", content=body.message)
@@ -160,7 +179,10 @@ async def chat(
     start_time = time.time()
 
     # 记忆压缩改为后台异步执行，不阻塞流式响应
-    if await should_compress_history(history):
+    # history_count_for_compress: total_msg_count includes new user msg, subtract 1
+    rounds_before_new = (history_count_for_compress - 1) // 2
+    should_compress = rounds_before_new > 10
+    if should_compress:
         logger.info(f"会话 {session_id} 触发记忆压缩（后台异步执行）")
 
         async def compress_and_save():
@@ -175,7 +197,7 @@ async def chat(
             try:
                 # Use a fresh DB session to avoid relying on the request-scoped one
                 async with AsyncSessionLocal() as db_compress:
-                    new_summary = await get_new_summary(session.summary, history)
+                    new_summary = await get_new_summary(session.summary, full_history)
                     await db_compress.execute(
                         update(SessionModel)
                         .where(SessionModel.id == session_id)
