@@ -35,6 +35,5 @@ def setup_logger():
         retention="7 days",
         level="DEBUG",
         format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {extra[request_id]} | {name}:{function}:{line} - {message}",
-        extra={"request_id": ""},
     )
     return logger
