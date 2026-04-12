@@ -34,7 +34,7 @@ class Settings(BaseSettings):
 
     # Chroma
     chroma_host: str = "chroma"
-    chroma_port: int = 8001
+    chroma_port: int = 8000
 
     # 文件存储
     file_storage_path: str = "/data/files"

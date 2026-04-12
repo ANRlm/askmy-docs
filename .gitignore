@@ -39,3 +39,7 @@ data/files/
 # uv
 .uv/
 uv.lock
+
+# Frontend
+frontend/node_modules/
+frontend/dist/

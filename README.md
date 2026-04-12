@@ -1,6 +1,6 @@
-# AI 知识助手（askmy-docs）
+# AskMyDocs
 
-> 用户可以上传自己的文档，创建私有知识库，然后用自然语言（文字或语音）向知识库提问，系统基于 RAG 技术检索相关内容并生成带引用来源的回答。
+> 上传文档，创建私有知识库，用自然语言（文字或语音）向知识库提问。系统基于 RAG 技术检索相关内容，流式生成带引用来源的回答。
 
 ---
 
@@ -8,16 +8,17 @@
 
 | 层级 | 选型 |
 |---|---|
+| 前端 | React 18 + TypeScript + Vite + Tailwind CSS |
 | 后端框架 | Python + FastAPI |
 | 数据库 | PostgreSQL 15 |
-| 向量数据库 | Chroma |
+| 向量数据库 | Chroma 1.0 |
 | 缓存 / 队列 | Redis 7 + RQ |
 | LLM 接口 | OpenAI 兼容接口（阿里百炼） |
 | Embedding | 阿里百炼 text-embedding-v3 |
-| STT | 阿里百炼 paraformer-realtime-v2 |
-| TTS | 阿里百炼 cosyvoice-v1 |
-| 部署 | Docker Compose |
-| 鉴权 | JWT + API Key |
+| STT | 阿里百炼 Qwen3-ASR-Flash |
+| TTS | 阿里百炼 cosyvoice-v3-flash |
+| 部署 | Docker Compose（6 个服务） |
+| 鉴权 | JWT |
 
 ---
 
@@ -33,9 +34,27 @@ docker compose up -d
 
 # 3. 查看服务状态
 docker compose ps
+```
 
-# 4. 访问 API 文档
-open http://localhost:8000/docs
+启动后访问：
+- **前端界面**：http://localhost:3000
+- **API 文档**：http://localhost:8000/docs
+
+---
+
+## 服务架构
+
+```
+frontend (Nginx:3000)
+    └── 反向代理 /api/ → backend
+
+backend  (FastAPI:8000)
+    ├── PostgreSQL  — 用户、知识库、会话、消息
+    ├── Redis       — 限流 + 异步任务队列
+    └── Chroma      — 向量检索
+
+worker   (RQ Worker)
+    └── 异步文档解析、分块、Embedding 写入 Chroma
 ```
 
 ---
@@ -47,15 +66,16 @@ open http://localhost:8000/docs
 | `DATABASE_URL` | PostgreSQL 连接字符串 |
 | `REDIS_URL` | Redis 连接字符串 |
 | `LLM_BASE_URL` | LLM API 基础地址（OpenAI 兼容） |
-| `LLM_API_KEY` | LLM API Key（阿里百炼） |
-| `LLM_MODEL` | 使用的 LLM 模型名（如 qwen-plus） |
+| `LLM_API_KEY` | LLM API Key |
+| `LLM_MODEL` | LLM 模型名（如 qwen-plus） |
 | `EMBEDDING_BASE_URL` | Embedding API 基础地址 |
 | `EMBEDDING_API_KEY` | Embedding API Key |
-| `EMBEDDING_MODEL` | Embedding 模型名（text-embedding-v3） |
-| `DASHSCOPE_API_KEY` | 阿里百炼语音 API Key |
+| `EMBEDDING_MODEL` | Embedding 模型名 |
+| `DASHSCOPE_API_KEY` | 阿里百炼语音 API Key（STT/TTS） |
 | `STT_MODEL` | 语音识别模型名 |
 | `TTS_MODEL` | 语音合成模型名 |
-| `JWT_SECRET` | JWT 签名密钥（请设置为随机强密码） |
+| `TTS_VOICE` | TTS 音色 |
+| `JWT_SECRET` | JWT 签名密钥（设置为随机强密码） |
 | `JWT_EXPIRE_DAYS` | JWT 有效期（天），默认 7 |
 | `RATE_LIMIT_PER_MINUTE` | 每用户每分钟最大请求数，默认 30 |
 | `CHROMA_HOST` | Chroma 服务地址 |
@@ -64,21 +84,31 @@ open http://localhost:8000/docs
 
 ---
 
-## 已实现功能
+## 功能列表
 
-- [x] 用户系统：注册、登录、JWT 鉴权
-- [x] API Key 管理：创建、列出、撤销
-- [x] 接口限流：滑动窗口，每用户每分钟 30 次
-- [x] 知识库管理：创建、列出、重命名、删除
-- [x] 文档管理：上传（PDF/MD/TXT）、列出、查询状态、删除
-- [x] RAG Pipeline：文本提取 → 分块 → Embedding → Chroma 存储（异步处理）
-- [x] 多轮对话问答：RAG 检索 + 流式 SSE 输出 + 引用来源
-- [x] 记忆压缩：超过 10 轮历史自动摘要压缩
-- [x] 语音交互：STT（语音转文字）、TTS（文字转语音）
-- [x] 评测系统：点赞/踩、统计好评率、平均响应时间
-- [x] 检索日志：记录每次 RAG 检索命中来源，可回溯
-- [x] Swagger 文档：`/docs` 自动生成
-- [x] Docker Compose 一键部署
+**用户系统**
+- 注册、登录、JWT 鉴权
+- 接口限流：滑动窗口，每用户每分钟 30 次
+
+**知识库管理**
+- 创建、重命名、删除知识库
+- 上传文档（PDF / Markdown / TXT）
+- 异步解析：文本提取 → 分块 → Embedding → Chroma 向量存储
+- 文档处理状态实时轮询
+
+**对话**
+- 多轮对话，RAG 检索 + 流式 SSE 输出
+- 可展开的引用来源列表（文件名、片段、相关度）
+- 超过 10 轮历史自动摘要压缩
+
+**语音交互**
+- STT：浏览器录音（WebM）→ 识别为文字填入输入框
+- TTS：点击播放按钮朗读 AI 回答
+
+**前端**
+- 简洁黑白风格，双栏布局（知识库树 + 对话区）
+- Markdown 渲染（含代码块、表格）
+- 流式打字动画、自动滚动
 
 ---
 
@@ -88,9 +118,6 @@ open http://localhost:8000/docs
 - `POST /api/auth/register` — 注册
 - `POST /api/auth/login` — 登录，返回 JWT
 - `GET /api/auth/me` — 获取当前用户信息
-- `POST /api/auth/api-keys` — 创建 API Key
-- `GET /api/auth/api-keys` — 列出 API Key
-- `DELETE /api/auth/api-keys/{id}` — 撤销 API Key
 
 ### 知识库
 - `POST /api/kb` — 创建知识库
@@ -101,7 +128,6 @@ open http://localhost:8000/docs
 ### 文档
 - `POST /api/kb/{kb_id}/documents` — 上传文档
 - `GET /api/kb/{kb_id}/documents` — 列出文档
-- `GET /api/kb/{kb_id}/documents/{doc_id}` — 查询状态
 - `DELETE /api/kb/{kb_id}/documents/{doc_id}` — 删除文档
 
 ### 对话
@@ -112,13 +138,12 @@ open http://localhost:8000/docs
 - `DELETE /api/sessions/{session_id}` — 删除会话
 
 ### 语音
-- `POST /api/voice/stt` — 语音转文字
-- `POST /api/voice/tts` — 文字转语音
+- `POST /api/voice/stt` — 语音转文字（支持 WebM / WAV / MP3 / M4A）
+- `POST /api/voice/tts` — 文字转语音（返回 MP3）
 
-### 评测
+### 统计与反馈
 - `POST /api/messages/{message_id}/feedback` — 点赞/踩
 - `GET /api/kb/{kb_id}/stats` — 知识库统计
-- `GET /api/messages/{message_id}/sources` — 查看检索来源
 
 ---
 

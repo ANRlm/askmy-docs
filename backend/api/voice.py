@@ -11,7 +11,7 @@ import io
 
 router = APIRouter(prefix="/api/voice", tags=["语音交互"])
 
-ALLOWED_AUDIO_FORMATS = {"wav", "mp3", "m4a"}
+ALLOWED_AUDIO_FORMATS = {"wav", "mp3", "m4a", "webm", "ogg"}
 
 
 class TTSRequest(BaseModel):
