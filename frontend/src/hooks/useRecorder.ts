@@ -2,6 +2,22 @@ import { useRef, useState, useCallback } from 'react'
 
 type OnRecordingComplete = (blob: Blob, ext: string) => void
 
+// 按优先级选择浏览器支持的音频格式，优先选阿里百炼 STT 支持的格式
+function pickMimeType(): { mimeType: string; ext: string } {
+  const candidates = [
+    { mimeType: 'audio/ogg;codecs=opus', ext: 'ogg' },
+    { mimeType: 'audio/ogg', ext: 'ogg' },
+    { mimeType: 'audio/mp4', ext: 'mp4' },
+    { mimeType: 'audio/webm;codecs=opus', ext: 'webm' },
+    { mimeType: 'audio/webm', ext: 'webm' },
+  ]
+  for (const c of candidates) {
+    if (MediaRecorder.isTypeSupported(c.mimeType)) return c
+  }
+  // 最终回退，让浏览器自行选择
+  return { mimeType: '', ext: 'ogg' }
+}
+
 export function useRecorder(onComplete: OnRecordingComplete) {
   const [recording, setRecording] = useState(false)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -10,10 +26,10 @@ export function useRecorder(onComplete: OnRecordingComplete) {
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : 'audio/webm'
-      const recorder = new MediaRecorder(stream, { mimeType })
+      const { mimeType, ext } = pickMimeType()
+
+      const options = mimeType ? { mimeType } : {}
+      const recorder = new MediaRecorder(stream, options)
       chunksRef.current = []
 
       recorder.ondataavailable = (e) => {
@@ -22,11 +38,13 @@ export function useRecorder(onComplete: OnRecordingComplete) {
 
       recorder.onstop = () => {
         stream.getTracks().forEach((t) => t.stop())
-        const blob = new Blob(chunksRef.current, { type: mimeType })
-        onComplete(blob, 'webm')
+        const finalMime = mimeType || recorder.mimeType || 'audio/ogg'
+        const blob = new Blob(chunksRef.current, { type: finalMime })
+        onComplete(blob, ext)
       }
 
-      recorder.start()
+      // timeslice=100ms：每 100ms 触发一次 ondataavailable，避免短录音数据丢失
+      recorder.start(100)
       mediaRecorderRef.current = recorder
       setRecording(true)
     } catch (e) {
@@ -35,8 +53,10 @@ export function useRecorder(onComplete: OnRecordingComplete) {
   }, [onComplete])
 
   const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop()
+    const recorder = mediaRecorderRef.current
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.stop() // onstop 回调里会调用 onComplete
+      mediaRecorderRef.current = null
       setRecording(false)
     }
   }, [])

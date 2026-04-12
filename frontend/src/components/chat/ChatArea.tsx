@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Send, Mic, MicOff, Volume2, VolumeX, ChevronDown, ChevronRight, FileText, Square, ArrowUp } from 'lucide-react'
+import { Mic, MicOff, Volume2, VolumeX, ChevronDown, ChevronRight, FileText, Square, ArrowUp, Loader2 } from 'lucide-react'
 import * as api from '../../api'
 import type { Message, Session, KnowledgeBase, Source } from '../../types'
 import { useRecorder } from '../../hooks/useRecorder'
@@ -74,7 +74,12 @@ function TtsButton({ text }: { text: string }) {
       className="flex items-center gap-1 px-2 py-1 rounded text-[11px] text-white/30 hover:text-white/60 hover:bg-white/[0.05] transition-colors"
       title={playing ? '停止播放' : '语音播放'}
     >
-      {playing ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+      {loading
+        ? <Loader2 className="w-3 h-3 animate-spin" />
+        : playing
+          ? <VolumeX className="w-3 h-3" />
+          : <Volume2 className="w-3 h-3" />
+      }
       <span>{playing ? '停止' : '播放'}</span>
     </button>
   )
@@ -133,15 +138,63 @@ export default function ChatArea({ kb, session }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
+  const [sttLoading, setSttLoading] = useState(false)
   const stopRef = useRef<(() => void) | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  // ref 持有 session / streaming 最新值，供 stt 回调使用（避免闭包过期）
+  const sessionRef = useRef(session)
+  const streamingRef = useRef(streaming)
+  useEffect(() => { sessionRef.current = session }, [session])
+  useEffect(() => { streamingRef.current = streaming }, [streaming])
 
+  // 核心发送函数，接受显式 text 参数，避免依赖 input state 的闭包问题
+  const doSend = useCallback((text: string) => {
+    const sess = sessionRef.current
+    if (!text.trim() || !sess || streamingRef.current) return
+
+    setInput('')
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
+
+    const userMsg: Message = { id: nextId(), role: 'user', content: text }
+    const assistantId = nextId()
+    const assistantMsg: Message = { id: assistantId, role: 'assistant', content: '', streaming: true }
+
+    setMessages((prev) => [...prev, userMsg, assistantMsg])
+    setStreaming(true)
+    streamingRef.current = true
+
+    const stop = api.chatStream(
+      sess.id,
+      text,
+      (chunk) => setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: m.content + chunk } : m)),
+      (sources) => setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, sources } : m)),
+      () => {
+        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, streaming: false } : m))
+        setStreaming(false)
+        streamingRef.current = false
+      },
+      (err) => {
+        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: `错误: ${err}`, streaming: false } : m))
+        setStreaming(false)
+        streamingRef.current = false
+      },
+    )
+    stopRef.current = stop
+  }, [])
+
+  // 语音识别完成回调：识别结果直接发送
   const { recording, startRecording, stopRecording } = useRecorder(async (blob, ext) => {
+    setSttLoading(true)
     try {
       const result = await api.stt(blob, ext)
-      setInput((prev) => prev + result.text)
-    } catch {}
+      const text = result.text.trim()
+      if (text) doSend(text)
+    } catch (e) {
+      console.error('STT 失败:', e)
+    } finally {
+      setSttLoading(false)
+    }
   })
 
   useEffect(() => {
@@ -160,65 +213,20 @@ export default function ChatArea({ kb, session }: Props) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const send = useCallback(() => {
-    if (!input.trim() || !session || streaming) return
-    const text = input.trim()
-    setInput('')
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
-    }
-
-    const userMsg: Message = { id: nextId(), role: 'user', content: text }
-    const assistantId = nextId()
-    const assistantMsg: Message = { id: assistantId, role: 'assistant', content: '', streaming: true }
-
-    setMessages((prev) => [...prev, userMsg, assistantMsg])
-    setStreaming(true)
-
-    const stop = api.chatStream(
-      session.id,
-      text,
-      (chunk) => {
-        setMessages((prev) =>
-          prev.map((m) => m.id === assistantId ? { ...m, content: m.content + chunk } : m)
-        )
-      },
-      (sources) => {
-        setMessages((prev) =>
-          prev.map((m) => m.id === assistantId ? { ...m, sources } : m)
-        )
-      },
-      (_messageId) => {
-        setMessages((prev) =>
-          prev.map((m) => m.id === assistantId ? { ...m, streaming: false } : m)
-        )
-        setStreaming(false)
-      },
-      (err) => {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId ? { ...m, content: `错误: ${err}`, streaming: false } : m
-          )
-        )
-        setStreaming(false)
-      },
-    )
-    stopRef.current = stop
-  }, [input, session, streaming])
+  const handleSend = () => doSend(input)
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      send()
+      handleSend()
     }
   }
 
   const handleStop = () => {
     stopRef.current?.()
     setStreaming(false)
-    setMessages((prev) =>
-      prev.map((m) => m.streaming ? { ...m, streaming: false } : m)
-    )
+    streamingRef.current = false
+    setMessages((prev) => prev.map((m) => m.streaming ? { ...m, streaming: false } : m))
   }
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -236,7 +244,7 @@ export default function ChatArea({ kb, session }: Props) {
             <span className="text-white/30 font-bold text-lg">AI</span>
           </div>
           <p className="text-sm font-medium text-white/40">
-            {kb ? `选择或新建会话` : '请先选择知识库'}
+            {kb ? '选择或新建会话' : '请先选择知识库'}
           </p>
           <p className="text-xs mt-1 text-white/20">
             {kb ? `当前知识库：${kb.name}` : '在左侧选择知识库，然后新建会话'}
@@ -272,30 +280,49 @@ export default function ChatArea({ kb, session }: Props) {
 
       {/* Input */}
       <div className="px-4 pb-5 pt-3 flex-shrink-0 max-w-3xl w-full mx-auto">
-        <div className="relative flex flex-col bg-[#1c1c1c] border border-white/[0.1] rounded-2xl focus-within:border-white/20 transition-colors">
+        <div className={`relative flex flex-col bg-[#1c1c1c] border rounded-2xl transition-colors ${
+          recording ? 'border-red-500/40' : 'border-white/[0.1] focus-within:border-white/20'
+        }`}>
           <textarea
             ref={textareaRef}
             value={input}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
-            placeholder="输入问题... (Enter 发送，Shift+Enter 换行)"
+            placeholder={
+              recording
+                ? '正在录音，再次点击麦克风结束...'
+                : sttLoading
+                  ? '识别中...'
+                  : '输入问题... (Enter 发送，Shift+Enter 换行)'
+            }
             rows={1}
-            className="w-full resize-none bg-transparent text-white/85 placeholder-white/20 text-sm focus:outline-none leading-relaxed px-4 pt-3 pb-2"
+            disabled={recording || sttLoading}
+            className="w-full resize-none bg-transparent text-white/85 placeholder-white/25 text-sm focus:outline-none leading-relaxed px-4 pt-3 pb-2 disabled:opacity-50"
             style={{ maxHeight: '160px' }}
           />
           <div className="flex items-center justify-between px-3 pb-2.5">
             {/* Mic button */}
             <button
               onClick={recording ? stopRecording : startRecording}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+              disabled={sttLoading || streaming}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                 recording
                   ? 'bg-red-500/15 text-red-400 hover:bg-red-500/20'
-                  : 'text-white/30 hover:text-white/60 hover:bg-white/[0.06]'
+                  : sttLoading
+                    ? 'text-white/30'
+                    : 'text-white/30 hover:text-white/60 hover:bg-white/[0.06]'
               }`}
-              title={recording ? '停止录音' : '语音输入'}
+              title={recording ? '再次点击结束录音，自动发送' : '语音输入（识别后自动发送）'}
             >
-              {recording ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-              <span>{recording ? '录音中...' : '语音'}</span>
+              {sttLoading
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : recording
+                  ? <MicOff className="w-3.5 h-3.5" />
+                  : <Mic className="w-3.5 h-3.5" />
+              }
+              <span>
+                {sttLoading ? '识别中...' : recording ? '点击结束' : '语音'}
+              </span>
             </button>
 
             {/* Send / Stop */}
@@ -309,8 +336,8 @@ export default function ChatArea({ kb, session }: Props) {
               </button>
             ) : (
               <button
-                onClick={send}
-                disabled={!input.trim()}
+                onClick={handleSend}
+                disabled={!input.trim() || sttLoading || recording}
                 className="w-8 h-8 flex items-center justify-center rounded-lg bg-white text-black hover:bg-white/90 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
                 title="发送"
               >
