@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, avg
+from sqlalchemy import select, func
 from pydantic import BaseModel
 from database import get_db
 from models.user import User

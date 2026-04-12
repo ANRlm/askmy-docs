@@ -9,7 +9,7 @@ rq==1.16.2
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-multipart==0.0.12
-pydantic==2.9.2
+pydantic[email]==2.9.2
 pydantic-settings==2.5.2
 openai==1.51.2
 chromadb==0.5.15
