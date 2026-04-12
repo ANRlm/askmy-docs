@@ -40,24 +40,32 @@ export default function AuthPage() {
     }
   }
 
-  const inputClass =
-    'w-full px-3.5 py-2.5 rounded-xl text-sm focus:outline-none transition-all duration-150 ' +
-    'placeholder:text-[color:var(--text-disabled)] ' +
-    'text-[color:var(--text-primary)] ' +
-    'bg-[var(--bg-input)] border border-[var(--border)] ' +
-    'focus:border-[var(--border-strong)] focus:bg-[var(--bg-hover)]'
-
   return (
     <div
       className="min-h-screen flex items-center justify-center p-4"
       style={{ background: 'var(--bg-base)' }}
     >
-      <div className="w-full max-w-[360px] animate-slide-up">
+      {/* Subtle background grid pattern */}
+      <div
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          backgroundImage: `
+            linear-gradient(var(--border) 1px, transparent 1px),
+            linear-gradient(90deg, var(--border) 1px, transparent 1px)
+          `,
+          backgroundSize: '48px 48px',
+          maskImage: 'radial-gradient(ellipse 80% 60% at 50% 40%, black 30%, transparent 100%)',
+          WebkitMaskImage: 'radial-gradient(ellipse 80% 60% at 50% 40%, black 30%, transparent 100%)',
+          opacity: 0.4,
+        }}
+      />
+
+      <div className="relative w-full max-w-[360px] animate-slide-up">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2.5 mb-8">
           <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm"
-            style={{ background: 'var(--accent)' }}
+            className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{ background: 'var(--accent)', boxShadow: 'var(--shadow-glow)' }}
           >
             <BookOpen className="w-4.5 h-4.5" style={{ color: 'var(--accent-fg)' }} />
           </div>
@@ -68,11 +76,11 @@ export default function AuthPage() {
 
         {/* Card */}
         <div
-          className="rounded-2xl p-7 shadow-md"
+          className="rounded-2xl p-7"
           style={{
-            background: 'var(--bg-panel)',
+            background: 'var(--bg-elevated)',
             border: '1px solid var(--border)',
-            boxShadow: 'var(--shadow-md)',
+            boxShadow: 'var(--shadow-lg)',
           }}
         >
           {/* Tab switcher */}
@@ -116,7 +124,20 @@ export default function AuthPage() {
                 placeholder="your@email.com"
                 required
                 autoComplete="email"
-                className={inputClass}
+                className="w-full px-3.5 py-2.5 rounded-xl text-sm focus:outline-none transition-all duration-150"
+                style={{
+                  background: 'var(--bg-input)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-primary)',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--border-accent)'
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.08)'
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--border)'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
               />
             </div>
 
@@ -136,12 +157,25 @@ export default function AuthPage() {
                   placeholder="••••••••"
                   required
                   autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                  className={inputClass + ' pr-10'}
+                  className="w-full px-3.5 py-2.5 rounded-xl text-sm focus:outline-none transition-all duration-150 pr-10"
+                  style={{
+                    background: 'var(--bg-input)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-primary)',
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--border-accent)'
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.08)'
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--border)'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPw(!showPw)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 interactive-icon p-0.5 rounded"
                   style={{ color: 'var(--text-tertiary)' }}
                   tabIndex={-1}
                 >
@@ -169,7 +203,20 @@ export default function AuthPage() {
                   placeholder="••••••••"
                   required
                   autoComplete="new-password"
-                  className={inputClass}
+                  className="w-full px-3.5 py-2.5 rounded-xl text-sm focus:outline-none transition-all duration-150"
+                  style={{
+                    background: 'var(--bg-input)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-primary)',
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--border-accent)'
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.08)'
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--border)'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
                 />
               </div>
             )}
@@ -181,7 +228,7 @@ export default function AuthPage() {
                 style={{
                   background: 'var(--error-bg)',
                   color: 'var(--error)',
-                  border: '1px solid var(--error-bg)',
+                  border: '1px solid var(--error)',
                 }}
               >
                 {error}
@@ -195,6 +242,7 @@ export default function AuthPage() {
               style={{
                 background: 'var(--accent)',
                 color: 'var(--accent-fg)',
+                boxShadow: 'var(--accent-dim)',
               }}
             >
               {loading
@@ -212,7 +260,7 @@ export default function AuthPage() {
           <button
             onClick={() => switchMode(mode === 'login' ? 'register' : 'login')}
             className="ml-1 font-medium underline underline-offset-2 transition-colors"
-            style={{ color: 'var(--text-secondary)' }}
+            style={{ color: 'var(--accent-hover)' }}
           >
             {mode === 'login' ? '立即注册' : '去登录'}
           </button>

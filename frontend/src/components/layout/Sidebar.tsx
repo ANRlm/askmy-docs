@@ -157,11 +157,6 @@ export default function Sidebar({
       )
     : kbs
 
-  const inputCls =
-    'w-full px-2.5 py-1.5 rounded-lg text-[12px] focus:outline-none transition-colors ' +
-    'placeholder:text-[color:var(--text-disabled)] text-[color:var(--text-primary)] ' +
-    'bg-[var(--bg-input)] border border-[var(--border)] focus:border-[var(--border-strong)]'
-
   return (
     <>
       <aside
@@ -193,8 +188,12 @@ export default function Sidebar({
         {/* Search */}
         <div className="px-3 py-2.5" style={{ borderBottom: '1px solid var(--border)' }}>
           <div
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-colors"
-            style={{ background: 'var(--bg-input)', border: '1px solid var(--border)' }}
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
+            style={{
+              background: 'var(--bg-input)',
+              border: '1px solid var(--border)',
+              transition: 'border-color 0.15s, box-shadow 0.15s',
+            }}
           >
             <Search className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--text-disabled)' }} />
             <input
@@ -224,11 +223,9 @@ export default function Sidebar({
             </span>
             <button
               onClick={() => setCreating(!creating)}
-              className="w-5 h-5 flex items-center justify-center rounded-md transition-colors"
+              className="interactive-icon w-5 h-5 flex items-center justify-center rounded-md"
               style={{ color: 'var(--text-tertiary)' }}
               title="新建知识库"
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-active)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             >
               <Plus className="w-3.5 h-3.5" />
             </button>
@@ -246,18 +243,30 @@ export default function Sidebar({
                 value={newKbName}
                 onChange={(e) => setNewKbName(e.target.value)}
                 placeholder="知识库名称"
-                className={inputCls}
+                className="w-full px-2.5 py-1.5 rounded-lg text-[12px] focus:outline-none"
+                style={{
+                  background: 'var(--bg-input)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-primary)',
+                  transition: 'border-color 0.15s',
+                }}
               />
               <input
                 value={newKbDesc}
                 onChange={(e) => setNewKbDesc(e.target.value)}
                 placeholder="简介（可选）"
-                className={inputCls}
+                className="w-full px-2.5 py-1.5 rounded-lg text-[12px] focus:outline-none"
+                style={{
+                  background: 'var(--bg-input)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-primary)',
+                  transition: 'border-color 0.15s',
+                }}
               />
               <div className="flex gap-1.5">
                 <button
                   type="submit"
-                  className="flex-1 py-1.5 rounded-lg text-[12px] font-medium transition-colors"
+                  className="flex-1 py-1.5 rounded-lg text-[12px] font-medium interactive"
                   style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
                 >
                   创建
@@ -265,7 +274,7 @@ export default function Sidebar({
                 <button
                   type="button"
                   onClick={() => setCreating(false)}
-                  className="flex-1 py-1.5 rounded-lg text-[12px] transition-colors"
+                  className="flex-1 py-1.5 rounded-lg text-[12px] interactive"
                   style={{ background: 'var(--bg-active)', color: 'var(--text-secondary)' }}
                 >
                   取消
@@ -279,20 +288,14 @@ export default function Sidebar({
             <div key={kb.id}>
               {/* KB row */}
               <div
-                className="flex items-center gap-1.5 px-2.5 mx-1 my-0.5 rounded-lg transition-colors cursor-pointer group"
+                className="flex items-center gap-1.5 mx-1 my-0.5 rounded-lg cursor-pointer group"
                 style={{
                   background: selectedKb?.id === kb.id ? 'var(--bg-active)' : 'transparent',
                   color: selectedKb?.id === kb.id ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  transition: 'background 0.15s',
+                  padding: '6px 10px',
                 }}
                 onClick={() => handleSelectKb(kb)}
-                onMouseEnter={(e) => {
-                  if (selectedKb?.id !== kb.id)
-                    e.currentTarget.style.background = 'var(--bg-hover)'
-                }}
-                onMouseLeave={(e) => {
-                  if (selectedKb?.id !== kb.id)
-                    e.currentTarget.style.background = 'transparent'
-                }}
               >
                 <span className="flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center" style={{ color: 'var(--text-tertiary)' }}>
                   {expandedKb === kb.id
@@ -300,35 +303,25 @@ export default function Sidebar({
                     : <ChevronRight className="w-3 h-3" />
                   }
                 </span>
-                <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
-                <span className="flex-1 text-[13px] text-left truncate py-1.5 font-medium">
+                <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" style={{ color: selectedKb?.id === kb.id ? 'var(--accent)' : 'var(--text-tertiary)' }} />
+                <span className="flex-1 text-[13px] text-left truncate font-medium">
                   {kb.name}
                 </span>
-                {/* Actions (hover) */}
-                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-opacity">
+                {/* Action buttons */}
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={(e) => { e.stopPropagation(); setDocModalKb(kb) }}
-                    className="p-1 rounded-md transition-colors"
+                    className="interactive-icon p-1 rounded-md"
                     style={{ color: 'var(--text-tertiary)' }}
                     title="管理文档"
-                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-active)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
                     <Settings className="w-3 h-3" />
                   </button>
                   <button
                     onClick={(e) => handleDeleteKb(e, kb.id)}
-                    className="p-1 rounded-md transition-colors"
+                    className="interactive-icon p-1 rounded-md"
                     style={{ color: 'var(--text-tertiary)' }}
                     title="删除知识库"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'var(--error-bg)'
-                      e.currentTarget.style.color = 'var(--error)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent'
-                      e.currentTarget.style.color = 'var(--text-tertiary)'
-                    }}
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
@@ -344,16 +337,8 @@ export default function Sidebar({
                   {/* New session button */}
                   <button
                     onClick={() => handleNewSession(kb)}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] transition-colors rounded-lg mx-0.5"
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] rounded-lg mx-0.5 interactive"
                     style={{ color: 'var(--text-tertiary)' }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'var(--bg-hover)'
-                      e.currentTarget.style.color = 'var(--text-secondary)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent'
-                      e.currentTarget.style.color = 'var(--text-tertiary)'
-                    }}
                   >
                     <Plus className="w-3 h-3" />
                     <span>新建会话</span>
@@ -367,24 +352,11 @@ export default function Sidebar({
                         key={session.id}
                         onClick={() => renamingSessionId !== session.id && onSelectSession(session)}
                         onDoubleClick={(e) => handleDoubleClickSession(e, session)}
-                        className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg mx-0.5 transition-colors group cursor-pointer"
+                        className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg mx-0.5 group cursor-pointer"
                         style={{
-                          background:
-                            selectedSession?.id === session.id
-                              ? 'var(--bg-active)'
-                              : 'transparent',
-                          color:
-                            selectedSession?.id === session.id
-                              ? 'var(--text-primary)'
-                              : 'var(--text-tertiary)',
-                        }}
-                        onMouseEnter={(e) => {
-                          if (selectedSession?.id !== session.id)
-                            e.currentTarget.style.background = 'var(--bg-hover)'
-                        }}
-                        onMouseLeave={(e) => {
-                          if (selectedSession?.id !== session.id)
-                            e.currentTarget.style.background = 'transparent'
+                          background: selectedSession?.id === session.id ? 'var(--bg-active)' : 'transparent',
+                          color: selectedSession?.id === session.id ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                          transition: 'background 0.15s',
                         }}
                       >
                         <MessageSquare className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--text-disabled)' }} />
@@ -397,10 +369,10 @@ export default function Sidebar({
                             onBlur={() => handleRenameSubmit(session.id)}
                             onKeyDown={(e) => handleRenameKeyDown(e, session.id)}
                             onClick={(e) => e.stopPropagation()}
-                            className="flex-1 text-[12px] rounded px-1 py-0.5 focus:outline-none min-w-0"
+                            className="flex-1 text-[12px] rounded px-1.5 py-0.5 focus:outline-none min-w-0"
                             style={{
                               background: 'var(--bg-input)',
-                              border: '1px solid var(--border-strong)',
+                              border: '1px solid var(--border-accent)',
                               color: 'var(--text-primary)',
                             }}
                           />
@@ -412,16 +384,8 @@ export default function Sidebar({
 
                         <button
                           onClick={(e) => handleDeleteSession(e, session.id, kb.id)}
-                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded transition-colors shrink-0"
+                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded transition-opacity interactive-icon"
                           style={{ color: 'var(--text-tertiary)' }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'var(--error-bg)'
-                            e.currentTarget.style.color = 'var(--error)'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'transparent'
-                            e.currentTarget.style.color = 'var(--text-tertiary)'
-                          }}
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>
@@ -436,11 +400,15 @@ export default function Sidebar({
           {kbs.length === 0 && !creating && (
             <div
               className="flex flex-col items-center justify-center py-12 text-center px-4"
-              style={{ color: 'var(--text-disabled)' }}
             >
-              <FolderOpen className="w-8 h-8 mb-3 opacity-40" />
-              <p className="text-[12px] font-medium">暂无知识库</p>
-              <p className="text-[11px] mt-1 opacity-70">点击上方 + 创建</p>
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
+                style={{ background: 'var(--bg-hover)' }}
+              >
+                <FolderOpen className="w-5 h-5" style={{ color: 'var(--text-disabled)' }} />
+              </div>
+              <p className="text-[12px] font-medium" style={{ color: 'var(--text-tertiary)' }}>暂无知识库</p>
+              <p className="text-[11px] mt-1" style={{ color: 'var(--text-disabled)' }}>点击上方 + 创建</p>
             </div>
           )}
         </div>
@@ -448,25 +416,23 @@ export default function Sidebar({
         {/* User footer */}
         <div className="p-2.5" style={{ borderTop: '1px solid var(--border)' }}>
           <div
-            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer group transition-colors"
+            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer group interactive"
             onClick={logout}
-            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
           >
             <div
               className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-semibold uppercase"
-              style={{ background: 'var(--bg-active)', color: 'var(--text-secondary)' }}
+              style={{ background: 'var(--accent-dim)', color: 'var(--accent-hover)' }}
             >
               {user?.email?.[0] || 'U'}
             </div>
             <span
               className="flex-1 text-[12px] truncate font-medium"
-              style={{ color: 'var(--text-tertiary)' }}
+              style={{ color: 'var(--text-tertiary)', transition: 'color 0.15s' }}
             >
               {user?.email}
             </span>
             <LogOut
-              className="w-3.5 h-3.5 transition-colors"
+              className="w-3.5 h-3.5"
               style={{ color: 'var(--text-disabled)' }}
             />
           </div>

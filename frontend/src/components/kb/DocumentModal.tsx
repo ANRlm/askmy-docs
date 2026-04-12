@@ -18,7 +18,7 @@ const statusLabel: Record<Document['status'], string> = {
 const BADGE_CONFIG: Record<string, { color: string; bg: string; icon: React.ReactNode }> = {
   done:       { color: 'var(--success)',  bg: 'var(--success-bg)',  icon: <CheckCircle  className="w-3 h-3" /> },
   failed:     { color: 'var(--error)',    bg: 'var(--error-bg)',    icon: <AlertCircle  className="w-3 h-3" /> },
-  processing: { color: 'var(--info)',     bg: 'var(--info-bg)',      icon: <RefreshCw    className="w-3 h-3 animate-spin" /> },
+  processing: { color: 'var(--info)',     bg: 'var(--info-bg)',     icon: <RefreshCw    className="w-3 h-3 animate-spin" /> },
   pending:    { color: 'var(--warning)',  bg: 'var(--warning-bg)',  icon: <Clock        className="w-3 h-3" /> },
 }
 const BADGE_FALLBACK = { color: 'var(--text-disabled)', bg: 'var(--bg-hover)', icon: <Clock className="w-3 h-3" /> }
@@ -42,7 +42,6 @@ export default function DocumentModal({ kb, onClose }: Props) {
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  // Prevent setState after unmount
   const mountedRef = useRef(true)
 
   useEffect(() => {
@@ -119,10 +118,10 @@ export default function DocumentModal({ kb, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      {/* Backdrop */}
+      {/* Frosted glass backdrop */}
       <div
         className="absolute inset-0 animate-fade-in"
-        style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }}
+        style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
         onClick={onClose}
       />
 
@@ -152,7 +151,7 @@ export default function DocumentModal({ kb, onClose }: Props) {
             <button
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-semibold transition-all disabled:opacity-50 active:scale-95"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-semibold interactive disabled:opacity-40"
               style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
             >
               {uploading
@@ -163,10 +162,8 @@ export default function DocumentModal({ kb, onClose }: Props) {
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-xl transition-colors"
+              className="interactive-icon p-1.5 rounded-xl"
               style={{ color: 'var(--text-tertiary)' }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             >
               <X className="w-4 h-4" />
             </button>
@@ -209,11 +206,15 @@ export default function DocumentModal({ kb, onClose }: Props) {
           {docs.length === 0 ? (
             <div
               className="flex flex-col items-center justify-center py-14 text-center"
-              style={{ color: 'var(--text-disabled)' }}
             >
-              <FileText className="w-10 h-10 mb-3 opacity-30" />
+              <div
+                className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4"
+                style={{ background: 'var(--bg-hover)' }}
+              >
+                <FileText className="w-6 h-6" style={{ color: 'var(--text-disabled)' }} />
+              </div>
               <p className="text-[13px] font-medium" style={{ color: 'var(--text-tertiary)' }}>暂无文档</p>
-              <p className="text-[11px] mt-1">点击上传按钮添加文件</p>
+              <p className="text-[11px] mt-1" style={{ color: 'var(--text-disabled)' }}>点击上传按钮添加文件</p>
             </div>
           ) : (
             docs.map((doc) => (
@@ -221,8 +222,6 @@ export default function DocumentModal({ kb, onClose }: Props) {
                 key={doc.id}
                 className="flex items-center gap-3 px-3.5 py-3 rounded-xl group transition-colors"
                 style={{ background: 'var(--bg-hover)', border: '1px solid var(--border)' }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-active)')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
               >
                 <FileText className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-disabled)' }} />
                 <div className="flex-1 min-w-0">
@@ -232,7 +231,7 @@ export default function DocumentModal({ kb, onClose }: Props) {
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <StatusBadge status={doc.status} />
                     {doc.chunk_count != null && (
-                      <span className="text-[10.5px]" style={{ color: 'var(--text-disabled)' }}>
+                      <span className="text-[10.5pxpx]" style={{ color: 'var(--text-disabled)' }}>
                         {doc.chunk_count} 个片段
                       </span>
                     )}
@@ -245,10 +244,8 @@ export default function DocumentModal({ kb, onClose }: Props) {
                 </div>
                 <button
                   onClick={() => handleDelete(doc.id)}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all"
+                  className="interactive-icon p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
                   style={{ color: 'var(--text-tertiary)' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--error-bg)'; e.currentTarget.style.color = 'var(--error)' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-tertiary)' }}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>

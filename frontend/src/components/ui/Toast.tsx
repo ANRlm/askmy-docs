@@ -34,7 +34,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const toast = useCallback((message: string, type: ToastType = 'info') => {
     const id = String(++toastSeq)
     setToasts((prev) => [...prev.slice(-4), { id, message, type }])
-    const timer = setTimeout(() => dismiss(id), 3800)
+    const timer = setTimeout(() => dismiss(id), 4000)
     timers.current.set(id, timer)
   }, [dismiss])
 
@@ -55,25 +55,27 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
     success: {
       icon: <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--success)' }} />,
       border: 'var(--success)',
-      bg: 'var(--success-bg)',
+      bg: 'rgba(52, 211, 153, 0.08)',
     },
     error: {
       icon: <AlertCircle className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--error)' }} />,
       border: 'var(--error)',
-      bg: 'var(--error-bg)',
+      bg: 'rgba(248, 113, 113, 0.08)',
     },
     info: {
-      icon: <Info className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--info)' }} />,
-      border: 'var(--border-strong)',
+      icon: <Info className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--accent-hover)' }} />,
+      border: 'var(--border)',
       bg: 'var(--bg-elevated)',
     },
   }[toast.type]
 
   return (
     <div
-      className="pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl min-w-[240px] max-w-[380px] animate-toast-in"
+      className="pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl min-w-[260px] max-w-[380px] animate-toast-in"
       style={{
-        background: 'var(--bg-elevated)',
+        background: config.bg,
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
         border: `1px solid ${config.border}`,
         boxShadow: 'var(--shadow-lg)',
       }}
@@ -84,7 +86,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
       </p>
       <button
         onClick={() => onDismiss(toast.id)}
-        className="transition-colors mt-0.5 shrink-0"
+        className="transition-colors mt-0.5 shrink-0 interactive-icon p-0.5 rounded"
         style={{ color: 'var(--text-tertiary)' }}
       >
         <X className="w-3.5 h-3.5" />
