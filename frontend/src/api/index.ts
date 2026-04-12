@@ -120,16 +120,47 @@ export function chatStream(
   onDone: (messageId: number) => void,
   onError: (err: string) => void,
 ): () => void {
+  return _streamChat(`${BASE_URL}/sessions/${sessionId}/chat`, { message }, onText, onSources, onDone, onError)
+}
+
+// Retrace: edit a past user message and regenerate from that point
+export function retraceChat(
+  sessionId: number,
+  messageId: number,
+  content: string,
+  onText: (chunk: string) => void,
+  onSources: (sources: Source[]) => void,
+  onDone: (assistantMsgId: number) => void,
+  onError: (err: string) => void,
+  onUserMsgId?: (userMsgId: number) => void,
+): () => void {
+  return _streamChat(
+    `${BASE_URL}/sessions/${sessionId}/retrace`,
+    { message_id: messageId, content },
+    onText, onSources, onDone, onError,
+    onUserMsgId,
+  )
+}
+
+function _streamChat(
+  url: string,
+  body: object,
+  onText: (chunk: string) => void,
+  onSources: (sources: Source[]) => void,
+  onDone: (messageId: number) => void,
+  onError: (err: string) => void,
+  onUserMsgId?: (userMsgId: number) => void,
+): () => void {
   const token = getToken()
   const ctrl = new AbortController()
 
-  fetch(`${BASE_URL}/sessions/${sessionId}/chat`, {
+  fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify(body),
     signal: ctrl.signal,
   }).then(async (res) => {
     if (!res.ok) {
@@ -153,6 +184,7 @@ export function chatStream(
           if (data.type === 'text') onText(data.content)
           else if (data.type === 'sources') onSources(data.content)
           else if (data.type === 'done') onDone(data.message_id)
+          else if (data.type === 'user_msg_id') onUserMsgId?.(data.message_id)
           else if (data.type === 'error') onError(data.content)
         } catch {}
       }

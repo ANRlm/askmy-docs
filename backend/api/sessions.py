@@ -3,7 +3,7 @@ import time
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from pydantic import BaseModel
 from database import get_db
 from models.user import User
@@ -31,6 +31,11 @@ class RenameSessionRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
+
+
+class RetraceRequest(BaseModel):
+    message_id: int
+    content: str  # 新的用户消息内容（可与原内容相同）
 
 
 @router.post("/api/kb/{kb_id}/sessions", summary="创建会话")
@@ -240,6 +245,131 @@ async def delete_session(
     await db.delete(session)
     await db.commit()
     return {"message": "会话已删除"}
+
+
+@router.post("/api/sessions/{session_id}/retrace", summary="回溯并重新生成（修改历史消息）")
+async def retrace_chat(
+    session_id: int,
+    body: RetraceRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await check_rate_limit(request, current_user.id)
+
+    result = await db.execute(
+        select(Session).where(Session.id == session_id, Session.user_id == current_user.id)
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="会话不存在")
+
+    # 找到目标用户消息，确认它属于该会话且 role=user
+    result = await db.execute(
+        select(Message).where(Message.id == body.message_id, Message.session_id == session_id)
+    )
+    target_msg = result.scalar_one_or_none()
+    if not target_msg:
+        raise HTTPException(status_code=404, detail="消息不存在")
+    if target_msg.role != "user":
+        raise HTTPException(status_code=400, detail="只能回溯用户消息")
+
+    # 删除目标消息及其之后的所有消息（Feedback/RetrievalLog 通过 CASCADE 自动删除）
+    await db.execute(
+        delete(Message).where(
+            Message.session_id == session_id,
+            Message.created_at >= target_msg.created_at,
+        )
+    )
+
+    # 清空记忆摘要（历史已被截断，摘要可能引用已删除的内容）
+    session.summary = None
+    await db.commit()
+
+    # 获取截断后的历史消息作为新的 history
+    result = await db.execute(
+        select(Message).where(Message.session_id == session_id).order_by(Message.created_at)
+    )
+    remaining_messages = result.scalars().all()
+    history = [{"role": m.role, "content": m.content} for m in remaining_messages]
+
+    # 保存新的用户消息
+    new_content = body.content.strip() or target_msg.content
+    user_msg = Message(session_id=session_id, role="user", content=new_content)
+    db.add(user_msg)
+    await db.commit()
+    await db.refresh(user_msg)
+
+    start_time = time.time()
+
+    async def event_generator():
+        full_response = []
+        sources = []
+
+        try:
+            async for text_chunk, chunk_sources in rag_chat_stream(
+                kb_id=session.kb_id,
+                session_summary=None,
+                history_messages=history,
+                user_question=new_content,
+            ):
+                if text_chunk:
+                    full_response.append(text_chunk)
+                    yield f"data: {json.dumps({'type': 'text', 'content': text_chunk}, ensure_ascii=False)}\n\n"
+                if chunk_sources:
+                    sources = chunk_sources
+
+        except Exception as e:
+            logger.error(f"回溯 RAG 流式生成失败: {e}", exc_info=True)
+            yield f"data: {json.dumps({'type': 'error', 'content': '生成回答时发生错误'}, ensure_ascii=False)}\n\n"
+            return
+
+        response_time = time.time() - start_time
+        assistant_content = "".join(full_response)
+
+        sources_data = [
+            {
+                "filename": s["filename"],
+                "chunk_index": s["chunk_index"],
+                "text": s["text"][:300],
+                "score": round(s["score"], 4),
+            }
+            for s in sources
+        ]
+
+        async with db.begin():
+            assistant_msg = Message(
+                session_id=session_id,
+                role="assistant",
+                content=assistant_content,
+                sources=sources_data,
+                response_time=response_time,
+            )
+            db.add(assistant_msg)
+
+        await db.commit()
+        await db.refresh(assistant_msg)
+
+        for s in sources:
+            log = RetrievalLog(
+                message_id=assistant_msg.id,
+                document_id=int(s["document_id"]) if s.get("document_id") else None,
+                chunk_index=s["chunk_index"],
+                chunk_text=s["text"][:1000],
+                score=s["score"],
+            )
+            db.add(log)
+        await db.commit()
+
+        yield f"data: {json.dumps({'type': 'user_msg_id', 'message_id': user_msg.id}, ensure_ascii=False)}\n\n"
+        yield f"data: {json.dumps({'type': 'sources', 'content': sources_data}, ensure_ascii=False)}\n\n"
+        yield f"data: {json.dumps({'type': 'done', 'message_id': assistant_msg.id}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.patch("/api/sessions/{session_id}", summary="重命名会话")

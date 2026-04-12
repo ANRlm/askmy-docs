@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm'
 import {
   Mic, MicOff, Volume2, VolumeX, ChevronDown, ChevronRight,
   FileText, Square, ArrowUp, Loader2, ThumbsUp, ThumbsDown,
+  Pencil, X, RotateCcw,
 } from 'lucide-react'
 import * as api from '../../api'
 import type { Message, Session, KnowledgeBase, Source } from '../../types'
@@ -37,26 +38,17 @@ function SourceList({ sources }: { sources: Source[] }) {
             <div
               key={i}
               className="px-3 py-2 rounded-xl text-[12px]"
-              style={{
-                background: 'var(--bg-hover)',
-                border: '1px solid var(--border)',
-              }}
+              style={{ background: 'var(--bg-hover)', border: '1px solid var(--border)' }}
             >
               <div className="flex items-center justify-between mb-1">
-                <span
-                  className="font-medium truncate max-w-xs"
-                  style={{ color: 'var(--text-secondary)' }}
-                >
+                <span className="font-medium truncate max-w-xs" style={{ color: 'var(--text-secondary)' }}>
                   {s.filename}
                 </span>
                 <span className="ml-2 flex-shrink-0 text-[10px]" style={{ color: 'var(--text-disabled)' }}>
                   #{s.chunk_index} · {(s.score * 100).toFixed(0)}%
                 </span>
               </div>
-              <p
-                className="leading-relaxed line-clamp-3 text-[11px]"
-                style={{ color: 'var(--text-tertiary)' }}
-              >
+              <p className="leading-relaxed line-clamp-3 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
                 {s.text}
               </p>
             </div>
@@ -75,9 +67,7 @@ function TtsButton({ text }: { text: string }) {
 
   const toggle = async () => {
     if (playing && audioRef.current) {
-      audioRef.current.pause()
-      setPlaying(false)
-      return
+      audioRef.current.pause(); setPlaying(false); return
     }
     setLoading(true)
     try {
@@ -86,8 +76,7 @@ function TtsButton({ text }: { text: string }) {
       const audio = new Audio(url)
       audioRef.current = audio
       audio.onended = () => { setPlaying(false); URL.revokeObjectURL(url) }
-      audio.play()
-      setPlaying(true)
+      audio.play(); setPlaying(true)
     } catch {}
     setLoading(false)
   }
@@ -99,21 +88,10 @@ function TtsButton({ text }: { text: string }) {
       className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] transition-colors"
       style={{ color: 'var(--text-disabled)' }}
       title={playing ? '停止播放' : '语音播放'}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'var(--bg-hover)'
-        e.currentTarget.style.color = 'var(--text-tertiary)'
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'transparent'
-        e.currentTarget.style.color = 'var(--text-disabled)'
-      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-tertiary)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-disabled)' }}
     >
-      {loading
-        ? <Loader2 className="w-3 h-3 animate-spin" />
-        : playing
-          ? <VolumeX className="w-3 h-3" />
-          : <Volume2 className="w-3 h-3" />
-      }
+      {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : playing ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
       <span>{playing ? '停止' : '播放'}</span>
     </button>
   )
@@ -125,104 +103,182 @@ function FeedbackButtons({ dbId }: { dbId: number }) {
 
   const handleVote = async (rating: 1 | -1) => {
     if (voted !== null) return
-    try {
-      await api.submitFeedback(dbId, rating)
-      setVoted(rating)
-    } catch {}
+    try { await api.submitFeedback(dbId, rating); setVoted(rating) } catch {}
   }
 
   return (
     <div className="flex items-center gap-0.5">
-      <button
-        onClick={() => handleVote(1)}
-        disabled={voted !== null}
-        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] transition-colors disabled:cursor-default"
-        style={{
-          background: voted === 1 ? 'var(--success-bg)' : 'transparent',
-          color: voted === 1 ? 'var(--success)' : 'var(--text-disabled)',
-        }}
-        title="有帮助"
-        onMouseEnter={(e) => {
-          if (voted === null) {
-            e.currentTarget.style.background = 'var(--bg-hover)'
-            e.currentTarget.style.color = 'var(--text-tertiary)'
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (voted !== 1) {
-            e.currentTarget.style.background = 'transparent'
-            e.currentTarget.style.color = 'var(--text-disabled)'
-          }
-        }}
-      >
-        <ThumbsUp className="w-3 h-3" />
-      </button>
-      <button
-        onClick={() => handleVote(-1)}
-        disabled={voted !== null}
-        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] transition-colors disabled:cursor-default"
-        style={{
-          background: voted === -1 ? 'var(--error-bg)' : 'transparent',
-          color: voted === -1 ? 'var(--error)' : 'var(--text-disabled)',
-        }}
-        title="没有帮助"
-        onMouseEnter={(e) => {
-          if (voted === null) {
-            e.currentTarget.style.background = 'var(--bg-hover)'
-            e.currentTarget.style.color = 'var(--text-tertiary)'
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (voted !== -1) {
-            e.currentTarget.style.background = 'transparent'
-            e.currentTarget.style.color = 'var(--text-disabled)'
-          }
-        }}
-      >
-        <ThumbsDown className="w-3 h-3" />
-      </button>
+      {([1, -1] as const).map((r) => (
+        <button
+          key={r}
+          onClick={() => handleVote(r)}
+          disabled={voted !== null}
+          className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] transition-colors disabled:cursor-default"
+          style={{
+            background: voted === r ? (r === 1 ? 'var(--success-bg)' : 'var(--error-bg)') : 'transparent',
+            color: voted === r ? (r === 1 ? 'var(--success)' : 'var(--error)') : 'var(--text-disabled)',
+          }}
+          title={r === 1 ? '有帮助' : '没有帮助'}
+          onMouseEnter={(e) => { if (voted === null) { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-tertiary)' } }}
+          onMouseLeave={(e) => { if (voted !== r) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-disabled)' } }}
+        >
+          {r === 1 ? <ThumbsUp className="w-3 h-3" /> : <ThumbsDown className="w-3 h-3" />}
+        </button>
+      ))}
     </div>
   )
 }
 
-/* ── Message bubble ── */
-function MessageBubble({ msg }: { msg: Message }) {
-  const isUser = msg.role === 'user'
+/* ── Editable user message bubble ── */
+interface UserBubbleProps {
+  msg: Message
+  isStreaming: boolean
+  onRetrace: (msgId: number, content: string) => void
+}
 
-  if (isUser) {
+function UserBubble({ msg, isStreaming, onRetrace }: UserBubbleProps) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(msg.content)
+  const [hovered, setHovered] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const isComposingRef = useRef(false)
+
+  useEffect(() => {
+    if (editing && textareaRef.current) {
+      const el = textareaRef.current
+      el.style.height = 'auto'
+      el.style.height = el.scrollHeight + 'px'
+      el.focus()
+      el.setSelectionRange(el.value.length, el.value.length)
+    }
+  }, [editing])
+
+  const handleEdit = () => {
+    if (isStreaming) return
+    setDraft(msg.content)
+    setEditing(true)
+  }
+
+  const handleCancel = () => {
+    setEditing(false)
+    setDraft(msg.content)
+  }
+
+  const handleSubmit = () => {
+    const trimmed = draft.trim()
+    if (!trimmed || !msg.db_id) return
+    setEditing(false)
+    onRetrace(msg.db_id, trimmed)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // IME composition check: suppress Enter during composition
+    if (e.key === 'Enter' && !e.shiftKey && !isComposingRef.current) {
+      e.preventDefault()
+      handleSubmit()
+    }
+    if (e.key === 'Escape') handleCancel()
+  }
+
+  const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setDraft(e.target.value)
+    const el = e.target
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 200) + 'px'
+  }
+
+  if (editing) {
     return (
-      <div className="flex justify-end animate-slide-up">
-        <div
-          className="max-w-[72%] px-4 py-3 rounded-2xl rounded-tr-md text-sm leading-relaxed"
-          style={{
-            background: 'var(--accent)',
-            color: 'var(--accent-fg)',
-          }}
-        >
-          <p className="whitespace-pre-wrap">{msg.content}</p>
+      <div className="flex justify-end animate-fade-in">
+        <div className="max-w-[72%] w-full">
+          <textarea
+            ref={textareaRef}
+            value={draft}
+            onChange={handleInput}
+            onKeyDown={handleKeyDown}
+            onCompositionStart={() => { isComposingRef.current = true }}
+            onCompositionEnd={() => { isComposingRef.current = false }}
+            rows={1}
+            className="w-full resize-none rounded-2xl rounded-tr-md px-4 py-3 text-sm leading-relaxed focus:outline-none"
+            style={{
+              background: 'var(--bg-elevated)',
+              border: '2px solid var(--border-strong)',
+              color: 'var(--text-primary)',
+              maxHeight: '200px',
+            }}
+          />
+          <div className="flex items-center justify-end gap-1.5 mt-1.5">
+            <button
+              onClick={handleCancel}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] transition-colors"
+              style={{ color: 'var(--text-tertiary)', background: 'var(--bg-hover)' }}
+            >
+              <X className="w-3 h-3" />
+              取消
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={!draft.trim()}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-medium transition-colors disabled:opacity-40"
+              style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
+            >
+              <RotateCcw className="w-3 h-3" />
+              重新生成
+            </button>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
+    <div
+      className="flex justify-end animate-slide-up"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <div className="flex flex-col items-end gap-1 max-w-[72%]">
+        <div
+          className="px-4 py-3 rounded-2xl rounded-tr-md text-sm leading-relaxed"
+          style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
+        >
+          <p className="whitespace-pre-wrap">{msg.content}</p>
+        </div>
+        {/* Edit button — shown on hover, hidden during streaming */}
+        {!isStreaming && msg.db_id && (
+          <button
+            onClick={handleEdit}
+            className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] transition-all"
+            style={{
+              color: 'var(--text-disabled)',
+              opacity: hovered ? 1 : 0,
+              pointerEvents: hovered ? 'auto' : 'none',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-tertiary)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-disabled)' }}
+            title="编辑并重新生成"
+          >
+            <Pencil className="w-3 h-3" />
+            编辑
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ── AI message bubble ── */
+function AssistantBubble({ msg }: { msg: Message }) {
+  return (
     <div className="flex gap-3 animate-slide-up">
-      {/* Avatar */}
       <div
         className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 text-[10px] font-bold"
-        style={{
-          background: 'var(--bg-active)',
-          color: 'var(--text-tertiary)',
-        }}
+        style={{ background: 'var(--bg-active)', color: 'var(--text-tertiary)' }}
       >
         AI
       </div>
-
       <div className="flex-1 min-w-0">
-        <div
-          className="text-sm leading-relaxed"
-          style={{ color: 'var(--text-primary)' }}
-        >
+        <div className="text-sm leading-relaxed" style={{ color: 'var(--text-primary)' }}>
           <div className="prose prose-sm max-w-none">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
             {msg.streaming && (
@@ -231,26 +287,19 @@ function MessageBubble({ msg }: { msg: Message }) {
                   <span
                     key={i}
                     className="w-1.5 h-1.5 rounded-full inline-block animate-pulse-dot"
-                    style={{
-                      background: 'var(--text-tertiary)',
-                      animationDelay: `${i * 0.18}s`,
-                    }}
+                    style={{ background: 'var(--text-tertiary)', animationDelay: `${i * 0.18}s` }}
                   />
                 ))}
               </span>
             )}
           </div>
         </div>
-
-        {/* Actions bar */}
         {!msg.streaming && (
           <div className="flex items-center gap-0.5 mt-2">
             <TtsButton text={msg.content} />
             {msg.db_id && <FeedbackButtons dbId={msg.db_id} />}
           </div>
         )}
-
-        {/* Sources */}
         {!msg.streaming && msg.sources && msg.sources.length > 0 && (
           <SourceList sources={msg.sources} />
         )}
@@ -259,8 +308,8 @@ function MessageBubble({ msg }: { msg: Message }) {
   )
 }
 
-/* ── Typing indicator (for initial load) ── */
-function EmptyChat({ kb }: { kb: KnowledgeBase | null }) {
+/* ── Empty / no session placeholder ── */
+function EmptyState({ kb }: { kb: KnowledgeBase | null }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center" style={{ color: 'var(--text-disabled)' }}>
       <div
@@ -295,9 +344,13 @@ export default function ChatArea({ kb, session }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const sessionRef = useRef(session)
   const streamingRef = useRef(streaming)
+  // IME composition tracking for the main input
+  const isComposingRef = useRef(false)
+
   useEffect(() => { sessionRef.current = session }, [session])
   useEffect(() => { streamingRef.current = streaming }, [streaming])
 
+  /* ── Core send logic ── */
   const doSend = useCallback((text: string) => {
     const sess = sessionRef.current
     if (!text.trim() || !sess || streamingRef.current) return
@@ -305,45 +358,79 @@ export default function ChatArea({ kb, session }: Props) {
     setInput('')
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
 
-    const userMsg: Message = { id: nextId(), role: 'user', content: text }
+    const userMsgLocalId = nextId()
     const assistantId = nextId()
-    const assistantMsg: Message = { id: assistantId, role: 'assistant', content: '', streaming: true }
 
-    setMessages((prev) => [...prev, userMsg, assistantMsg])
+    setMessages((prev) => [
+      ...prev,
+      { id: userMsgLocalId, role: 'user', content: text },
+      { id: assistantId, role: 'assistant', content: '', streaming: true },
+    ])
     setStreaming(true)
     streamingRef.current = true
 
     const stop = api.chatStream(
       sess.id, text,
-      (chunk) =>
-        setMessages((prev) =>
-          prev.map((m) => m.id === assistantId ? { ...m, content: m.content + chunk } : m)
-        ),
-      (sources) =>
-        setMessages((prev) =>
-          prev.map((m) => m.id === assistantId ? { ...m, sources } : m)
-        ),
-      (dbMessageId) => {
-        setMessages((prev) =>
-          prev.map((m) => m.id === assistantId ? { ...m, streaming: false, db_id: dbMessageId } : m)
-        )
-        setStreaming(false)
-        streamingRef.current = false
+      (chunk) => setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: m.content + chunk } : m)),
+      (sources) => setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, sources } : m)),
+      (dbMsgId) => {
+        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, streaming: false, db_id: dbMsgId } : m))
+        setStreaming(false); streamingRef.current = false
       },
       (err) => {
-        setMessages((prev) =>
-          prev.map((m) => m.id === assistantId ? { ...m, content: `错误: ${err}`, streaming: false } : m)
-        )
-        setStreaming(false)
-        streamingRef.current = false
+        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: `错误: ${err}`, streaming: false } : m))
+        setStreaming(false); streamingRef.current = false
       },
     )
     stopRef.current = stop
   }, [])
 
+  /* ── Retrace (edit + regenerate) ── */
+  const doRetrace = useCallback((targetDbId: number, newContent: string) => {
+    const sess = sessionRef.current
+    if (!sess || streamingRef.current) return
+
+    // Find the index of the target message and truncate everything from that point
+    setMessages((prev) => {
+      const idx = prev.findIndex((m) => m.db_id === targetDbId)
+      if (idx === -1) return prev
+      return prev.slice(0, idx)
+    })
+
+    // Optimistically add the new user message + placeholder assistant message
+    const userLocalId = nextId()
+    const assistantId = nextId()
+    setMessages((prev) => [
+      ...prev,
+      { id: userLocalId, role: 'user', content: newContent },
+      { id: assistantId, role: 'assistant', content: '', streaming: true },
+    ])
+    setStreaming(true)
+    streamingRef.current = true
+
+    const stop = api.retraceChat(
+      sess.id, targetDbId, newContent,
+      (chunk) => setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: m.content + chunk } : m)),
+      (sources) => setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, sources } : m)),
+      (assistantDbId) => {
+        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, streaming: false, db_id: assistantDbId } : m))
+        setStreaming(false); streamingRef.current = false
+      },
+      (err) => {
+        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: `错误: ${err}`, streaming: false } : m))
+        setStreaming(false); streamingRef.current = false
+      },
+      // Patch the user message with the real db_id returned from backend
+      (userDbId) => {
+        setMessages((prev) => prev.map((m) => m.id === userLocalId ? { ...m, db_id: userDbId } : m))
+      },
+    )
+    stopRef.current = stop
+  }, [])
+
+  /* ── Voice recorder ── */
   const { recording, error: micError, startRecording, stopRecording } = useRecorder(async (blob, ext) => {
-    setSttLoading(true)
-    setSttError(null)
+    setSttLoading(true); setSttError(null)
     try {
       const result = await api.stt(blob, ext)
       const text = result.text.trim()
@@ -356,6 +443,7 @@ export default function ChatArea({ kb, session }: Props) {
     }
   })
 
+  /* ── Load history ── */
   useEffect(() => {
     if (!session) { setMessages([]); return }
     api.getMessages(session.id).then((msgs) => {
@@ -375,14 +463,17 @@ export default function ChatArea({ kb, session }: Props) {
 
   const handleSend = () => doSend(input)
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
+  /* ── IME-safe Enter handler ── */
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey && !isComposingRef.current) {
+      e.preventDefault()
+      handleSend()
+    }
   }
 
   const handleStop = () => {
     stopRef.current?.()
-    setStreaming(false)
-    streamingRef.current = false
+    setStreaming(false); streamingRef.current = false
     setMessages((prev) => prev.map((m) => m.streaming ? { ...m, streaming: false } : m))
   }
 
@@ -396,7 +487,7 @@ export default function ChatArea({ kb, session }: Props) {
   if (!session) {
     return (
       <div className="flex-1 flex flex-col" style={{ background: 'var(--bg-panel)' }}>
-        <EmptyChat kb={kb} />
+        <EmptyState kb={kb} />
       </div>
     )
   }
@@ -408,20 +499,12 @@ export default function ChatArea({ kb, session }: Props) {
         className="px-6 py-3.5 flex items-center gap-3 flex-shrink-0"
         style={{ borderBottom: '1px solid var(--border)' }}
       >
-        <div
-          className="w-2 h-2 rounded-full flex-shrink-0"
-          style={{ background: 'var(--success)' }}
-        />
+        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: 'var(--success)' }} />
         <div className="min-w-0">
-          <h2
-            className="text-sm font-semibold truncate"
-            style={{ color: 'var(--text-primary)' }}
-          >
+          <h2 className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
             {session.title}
           </h2>
-          <p className="text-[11px]" style={{ color: 'var(--text-disabled)' }}>
-            {kb?.name}
-          </p>
+          <p className="text-[11px]" style={{ color: 'var(--text-disabled)' }}>{kb?.name}</p>
         </div>
       </div>
 
@@ -434,9 +517,18 @@ export default function ChatArea({ kb, session }: Props) {
             </p>
           </div>
         )}
-        {messages.map((msg) => (
-          <MessageBubble key={msg.id} msg={msg} />
-        ))}
+        {messages.map((msg) =>
+          msg.role === 'user' ? (
+            <UserBubble
+              key={msg.id}
+              msg={msg}
+              isStreaming={streaming}
+              onRetrace={doRetrace}
+            />
+          ) : (
+            <AssistantBubble key={msg.id} msg={msg} />
+          )
+        )}
         <div ref={bottomRef} />
       </div>
 
@@ -465,24 +557,20 @@ export default function ChatArea({ kb, session }: Props) {
             value={input}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
+            onCompositionStart={() => { isComposingRef.current = true }}
+            onCompositionEnd={() => { isComposingRef.current = false }}
             placeholder={
-              recording
-                ? '正在录音，再次点击麦克风结束...'
-                : sttLoading
-                  ? '识别中...'
+              recording ? '正在录音，再次点击麦克风结束...'
+                : sttLoading ? '识别中...'
                   : '输入问题... (Enter 发送，Shift+Enter 换行)'
             }
             rows={1}
             disabled={recording || sttLoading}
             className="w-full resize-none bg-transparent text-sm focus:outline-none leading-relaxed px-4 pt-3.5 pb-2 disabled:opacity-50"
-            style={{
-              color: 'var(--text-primary)',
-              maxHeight: '160px',
-            }}
+            style={{ color: 'var(--text-primary)', maxHeight: '160px' }}
           />
 
           <div className="flex items-center justify-between px-3 pb-3">
-            {/* Mic button */}
             <button
               onClick={recording ? stopRecording : startRecording}
               disabled={sttLoading || streaming}
@@ -492,23 +580,15 @@ export default function ChatArea({ kb, session }: Props) {
                 color: recording ? 'var(--error)' : 'var(--text-tertiary)',
               }}
               title={recording ? '再次点击结束录音，自动发送' : '语音输入（识别后自动发送）'}
-              onMouseEnter={(e) => {
-                if (!recording) e.currentTarget.style.background = 'var(--bg-hover)'
-              }}
-              onMouseLeave={(e) => {
-                if (!recording) e.currentTarget.style.background = 'transparent'
-              }}
+              onMouseEnter={(e) => { if (!recording) e.currentTarget.style.background = 'var(--bg-hover)' }}
+              onMouseLeave={(e) => { if (!recording) e.currentTarget.style.background = 'transparent' }}
             >
-              {sttLoading
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                : recording
-                  ? <MicOff className="w-3.5 h-3.5" />
-                  : <Mic className="w-3.5 h-3.5" />
-              }
+              {sttLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : recording ? <MicOff className="w-3.5 h-3.5" />
+                  : <Mic className="w-3.5 h-3.5" />}
               <span>{sttLoading ? '识别中...' : recording ? '点击结束' : '语音'}</span>
             </button>
 
-            {/* Send / Stop */}
             {streaming ? (
               <button
                 onClick={handleStop}
@@ -534,7 +614,6 @@ export default function ChatArea({ kb, session }: Props) {
           </div>
         </div>
 
-        {/* Status line */}
         <p className="text-center text-[11px] mt-2" style={{ color: 'var(--text-disabled)' }}>
           {(micError || sttError)
             ? <span style={{ color: 'var(--error)' }}>{micError || sttError}</span>
