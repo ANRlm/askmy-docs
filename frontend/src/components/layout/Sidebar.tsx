@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { Plus, Trash2, FolderOpen, MessageSquare, ChevronDown, ChevronRight, BookOpen, LogOut, Settings } from 'lucide-react'
+import React, { useState, useEffect, useRef } from 'react'
+import { Plus, Trash2, FolderOpen, MessageSquare, ChevronDown, ChevronRight, BookOpen, LogOut, Settings, Search } from 'lucide-react'
 import * as api from '../../api'
 import type { KnowledgeBase, Session } from '../../types'
 import { useAuth } from '../../hooks/useAuth'
@@ -11,9 +11,10 @@ interface Props {
   onSelectKb: (kb: KnowledgeBase) => void
   onSelectSession: (session: Session) => void
   onNewSession: (session: Session) => void
+  onSessionRenamed?: (session: Session) => void
 }
 
-export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSelectSession, onNewSession }: Props) {
+export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSelectSession, onNewSession, onSessionRenamed }: Props) {
   const { user, logout } = useAuth()
   const [kbs, setKbs] = useState<KnowledgeBase[]>([])
   const [sessions, setSessions] = useState<Session[]>([])
@@ -22,6 +23,12 @@ export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSel
   const [creating, setCreating] = useState(false)
   const [newKbName, setNewKbName] = useState('')
   const [newKbDesc, setNewKbDesc] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+
+  // 重命名会话状态
+  const [renamingSessionId, setRenamingSessionId] = useState<number | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const renameInputRef = useRef<HTMLInputElement>(null)
 
   const loadKbs = async () => {
     try {
@@ -42,6 +49,13 @@ export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSel
   useEffect(() => {
     if (selectedKb) loadSessions(selectedKb.id)
   }, [selectedKb])
+
+  useEffect(() => {
+    if (renamingSessionId !== null) {
+      renameInputRef.current?.focus()
+      renameInputRef.current?.select()
+    }
+  }, [renamingSessionId])
 
   const handleSelectKb = (kb: KnowledgeBase) => {
     setExpandedKb(expandedKb === kb.id ? null : kb.id)
@@ -64,6 +78,32 @@ export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSel
       await api.deleteSession(sessionId)
       setSessions((prev) => prev.filter((s) => s.id !== sessionId))
     } catch {}
+  }
+
+  const handleDoubleClickSession = (e: React.MouseEvent, session: Session) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setRenamingSessionId(session.id)
+    setRenameValue(session.title)
+  }
+
+  const handleRenameSubmit = async (sessionId: number) => {
+    const trimmed = renameValue.trim()
+    if (!trimmed) {
+      setRenamingSessionId(null)
+      return
+    }
+    try {
+      const updated = await api.renameSession(sessionId, trimmed)
+      setSessions((prev) => prev.map((s) => s.id === sessionId ? { ...s, title: updated.title } : s))
+      onSessionRenamed?.(updated)
+    } catch {}
+    setRenamingSessionId(null)
+  }
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent, sessionId: number) => {
+    if (e.key === 'Enter') handleRenameSubmit(sessionId)
+    if (e.key === 'Escape') setRenamingSessionId(null)
   }
 
   const handleCreateKb = async (e: React.FormEvent) => {
@@ -96,6 +136,19 @@ export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSel
             <BookOpen className="w-4 h-4 text-black" />
           </div>
           <span className="font-semibold text-white text-sm">AskMyDocs</span>
+        </div>
+
+        {/* Search */}
+        <div className="px-3 py-2 border-b border-white/[0.06]">
+          <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-white/[0.04] border border-white/[0.06]">
+            <Search className="w-3 h-3 text-white/25 flex-shrink-0" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="搜索知识库和会话..."
+              className="flex-1 bg-transparent text-white text-[12px] placeholder-white/20 focus:outline-none min-w-0"
+            />
+          </div>
         </div>
 
         {/* KB list */}
@@ -146,7 +199,16 @@ export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSel
             </form>
           )}
 
-          {kbs.map((kb) => (
+          {(() => {
+            const q = searchQuery.trim().toLowerCase()
+            const filteredKbs = q
+              ? kbs.filter(
+                  (kb) =>
+                    kb.name.toLowerCase().includes(q) ||
+                    sessions.some((s) => s.kb_id === kb.id && s.title.toLowerCase().includes(q))
+                )
+              : kbs
+            return filteredKbs.map((kb) => (
             <div key={kb.id}>
               <button
                 onClick={() => handleSelectKb(kb)}
@@ -191,31 +253,48 @@ export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSel
                     <span>新建会话</span>
                   </button>
                   {sessions
-                    .filter((s) => s.kb_id === kb.id)
+                    .filter((s) => {
+                      const q = searchQuery.trim().toLowerCase()
+                      return s.kb_id === kb.id && (!q || s.title.toLowerCase().includes(q))
+                    })
                     .map((session) => (
-                      <button
+                      <div
                         key={session.id}
-                        onClick={() => onSelectSession(session)}
-                        className={`w-full flex items-center gap-2 px-3 py-1.5 transition-colors group text-left ${
+                        onClick={() => renamingSessionId !== session.id && onSelectSession(session)}
+                        onDoubleClick={(e) => handleDoubleClickSession(e, session)}
+                        className={`w-full flex items-center gap-2 px-3 py-1.5 transition-colors group text-left cursor-pointer ${
                           selectedSession?.id === session.id
                             ? 'bg-white/[0.08] text-white/90'
                             : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
                         }`}
                       >
-                        <MessageSquare className="w-3 h-3 flex-shrink-0 text-white/30" />
-                        <span className="flex-1 text-[12px] truncate">{session.title}</span>
+                        <MessageSquare className="w-3 h-3 flex-shrink-0 text-white/30 shrink-0" />
+                        {renamingSessionId === session.id ? (
+                          <input
+                            ref={renameInputRef}
+                            value={renameValue}
+                            onChange={(e) => setRenameValue(e.target.value)}
+                            onBlur={() => handleRenameSubmit(session.id)}
+                            onKeyDown={(e) => handleRenameKeyDown(e, session.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex-1 text-[12px] bg-white/[0.08] text-white border border-white/20 rounded px-1 py-0.5 focus:outline-none min-w-0"
+                          />
+                        ) : (
+                          <span className="flex-1 text-[12px] truncate" title="双击重命名">{session.title}</span>
+                        )}
                         <button
                           onClick={(e) => handleDeleteSession(e, session.id)}
-                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-red-500/15 hover:text-red-400 text-white/30 transition-colors"
+                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-red-500/15 hover:text-red-400 text-white/30 transition-colors shrink-0"
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>
-                      </button>
+                      </div>
                     ))}
                 </div>
               )}
             </div>
-          ))}
+            ))
+          })()}
 
           {kbs.length === 0 && !creating && (
             <div className="text-center py-10 text-white/20 text-xs">

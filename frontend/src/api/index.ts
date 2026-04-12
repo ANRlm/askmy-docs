@@ -101,6 +101,10 @@ export async function deleteSession(sessionId: number): Promise<void> {
   return request(`/sessions/${sessionId}`, { method: 'DELETE' })
 }
 
+export async function renameSession(sessionId: number, title: string): Promise<Session> {
+  return request(`/sessions/${sessionId}`, { method: 'PATCH', body: JSON.stringify({ title }) })
+}
+
 export async function getMessages(sessionId: number): Promise<Array<{
   id: number; role: string; content: string; sources: Source[] | null; created_at: string
 }>> {
@@ -161,6 +165,13 @@ export function chatStream(
 }
 
 // Voice
+export async function submitFeedback(messageId: number, rating: 1 | -1): Promise<void> {
+  return request(`/messages/${messageId}/feedback`, {
+    method: 'POST',
+    body: JSON.stringify({ rating }),
+  })
+}
+
 export async function stt(audioBlob: Blob, ext: string): Promise<{ text: string }> {
   const formData = new FormData()
   formData.append('file', audioBlob, `recording.${ext}`)

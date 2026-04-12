@@ -37,6 +37,7 @@ export interface Source {
 
 export interface Message {
   id: string
+  db_id?: number  // 后端数据库消息 id，用于提交反馈
   role: 'user' | 'assistant'
   content: string
   sources?: Source[]

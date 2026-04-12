@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from typing import List
 
 
 class Settings(BaseSettings):
@@ -39,6 +40,13 @@ class Settings(BaseSettings):
     # 文件存储
     file_storage_path: str = "/data/files"
 
+    # CORS — 多个域名用英文逗号分隔，例如：http://localhost:3000,https://example.com
+    cors_origins: str = "http://localhost:3000"
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
     class Config:
         env_file = ".env"
         case_sensitive = False
@@ -50,3 +58,4 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+

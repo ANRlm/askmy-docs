@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -6,6 +6,7 @@ from loguru import logger
 
 from utils.logger import setup_logger
 from database import init_db
+from config import settings
 from api.auth import router as auth_router
 from api.knowledge_base import router as kb_router
 from api.documents import router as doc_router
@@ -15,10 +16,20 @@ from api.stats import router as stats_router
 
 setup_logger()
 
+_INSECURE_SECRETS = {"changeme", "change-me", "change-me-use-openssl-rand-hex-32", "secret", ""}
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("启动 AI 知识助手后端服务...")
+
+    # 生产安全检查
+    if settings.jwt_secret in _INSECURE_SECRETS:
+        logger.warning(
+            "⚠️  JWT_SECRET 使用了不安全的默认值！"
+            " 请在 .env 中设置随机密钥：openssl rand -hex 32"
+        )
+
     await init_db()
     logger.info("数据库初始化完成")
     yield
@@ -34,7 +45,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -49,8 +60,6 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"code": 500, "message": "服务器内部错误", "detail": str(exc)},
     )
 
-
-from fastapi import HTTPException
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):

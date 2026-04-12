@@ -25,6 +25,10 @@ class CreateSessionRequest(BaseModel):
     title: str = "新会话"
 
 
+class RenameSessionRequest(BaseModel):
+    title: str
+
+
 class ChatRequest(BaseModel):
     message: str
 
@@ -236,3 +240,28 @@ async def delete_session(
     await db.delete(session)
     await db.commit()
     return {"message": "会话已删除"}
+
+
+@router.patch("/api/sessions/{session_id}", summary="重命名会话")
+async def rename_session(
+    session_id: int,
+    body: RenameSessionRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await check_rate_limit(request, current_user.id)
+    result = await db.execute(
+        select(Session).where(Session.id == session_id, Session.user_id == current_user.id)
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="会话不存在")
+
+    title = body.title.strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="标题不能为空")
+
+    session.title = title
+    await db.commit()
+    return {"id": session.id, "title": session.title, "kb_id": session.kb_id}

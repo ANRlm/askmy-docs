@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Mic, MicOff, Volume2, VolumeX, ChevronDown, ChevronRight, FileText, Square, ArrowUp, Loader2 } from 'lucide-react'
+import { Mic, MicOff, Volume2, VolumeX, ChevronDown, ChevronRight, FileText, Square, ArrowUp, Loader2, ThumbsUp, ThumbsDown } from 'lucide-react'
 import * as api from '../../api'
 import type { Message, Session, KnowledgeBase, Source } from '../../types'
 import { useRecorder } from '../../hooks/useRecorder'
@@ -85,6 +85,47 @@ function TtsButton({ text }: { text: string }) {
   )
 }
 
+function FeedbackButtons({ dbId }: { dbId: number }) {
+  const [voted, setVoted] = useState<1 | -1 | null>(null)
+
+  const handleVote = async (rating: 1 | -1) => {
+    if (voted !== null) return
+    try {
+      await api.submitFeedback(dbId, rating)
+      setVoted(rating)
+    } catch {}
+  }
+
+  return (
+    <div className="flex items-center gap-0.5">
+      <button
+        onClick={() => handleVote(1)}
+        disabled={voted !== null}
+        className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] transition-colors disabled:cursor-default ${
+          voted === 1
+            ? 'text-emerald-400 bg-emerald-500/10'
+            : 'text-white/30 hover:text-white/60 hover:bg-white/[0.05]'
+        }`}
+        title="有帮助"
+      >
+        <ThumbsUp className="w-3 h-3" />
+      </button>
+      <button
+        onClick={() => handleVote(-1)}
+        disabled={voted !== null}
+        className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] transition-colors disabled:cursor-default ${
+          voted === -1
+            ? 'text-red-400 bg-red-500/10'
+            : 'text-white/30 hover:text-white/60 hover:bg-white/[0.05]'
+        }`}
+        title="没有帮助"
+      >
+        <ThumbsDown className="w-3 h-3" />
+      </button>
+    </div>
+  )
+}
+
 function MessageBubble({ msg }: { msg: Message }) {
   const isUser = msg.role === 'user'
   if (isUser) {
@@ -121,6 +162,7 @@ function MessageBubble({ msg }: { msg: Message }) {
         {!msg.streaming && (
           <div className="flex items-center gap-1 mt-2">
             <TtsButton text={msg.content} />
+            {msg.db_id && <FeedbackButtons dbId={msg.db_id} />}
           </div>
         )}
         {!msg.streaming && msg.sources && msg.sources.length > 0 && (
@@ -170,8 +212,8 @@ export default function ChatArea({ kb, session }: Props) {
       text,
       (chunk) => setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: m.content + chunk } : m)),
       (sources) => setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, sources } : m)),
-      () => {
-        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, streaming: false } : m))
+      (dbMessageId) => {
+        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, streaming: false, db_id: dbMessageId } : m))
         setStreaming(false)
         streamingRef.current = false
       },
@@ -205,6 +247,7 @@ export default function ChatArea({ kb, session }: Props) {
     api.getMessages(session.id).then((msgs) => {
       setMessages(msgs.map((m) => ({
         id: nextId(),
+        db_id: m.id,
         role: m.role as 'user' | 'assistant',
         content: m.content,
         sources: m.sources || [],
