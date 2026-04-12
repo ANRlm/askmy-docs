@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
-import { BookOpen } from 'lucide-react'
+import { BookOpen, Eye, EyeOff } from 'lucide-react'
 
 export default function AuthPage() {
   const { login, register } = useAuth()
@@ -8,6 +8,7 @@ export default function AuthPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -20,7 +21,6 @@ export default function AuthPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-
     if (mode === 'register' && password !== confirmPassword) {
       setError('两次输入的密码不一致')
       return
@@ -29,14 +29,10 @@ export default function AuthPage() {
       setError('密码至少 6 位')
       return
     }
-
     setLoading(true)
     try {
-      if (mode === 'login') {
-        await login(email, password)
-      } else {
-        await register(email, password)
-      }
+      if (mode === 'login') await login(email, password)
+      else await register(email, password)
     } catch (e: any) {
       setError(e.message || '操作失败')
     } finally {
@@ -44,66 +40,150 @@ export default function AuthPage() {
     }
   }
 
+  const inputClass =
+    'w-full px-3.5 py-2.5 rounded-xl text-sm focus:outline-none transition-all duration-150 ' +
+    'placeholder:text-[color:var(--text-disabled)] ' +
+    'text-[color:var(--text-primary)] ' +
+    'bg-[var(--bg-input)] border border-[var(--border)] ' +
+    'focus:border-[var(--border-strong)] focus:bg-[var(--bg-hover)]'
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
-      <div className="w-full max-w-sm px-4">
+    <div
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{ background: 'var(--bg-base)' }}
+    >
+      <div className="w-full max-w-[360px] animate-slide-up">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2.5 mb-8">
-          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center">
-            <BookOpen className="w-4.5 h-4.5 text-black" />
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm"
+            style={{ background: 'var(--accent)' }}
+          >
+            <BookOpen className="w-4.5 h-4.5" style={{ color: 'var(--accent-fg)' }} />
           </div>
-          <span className="text-xl font-semibold text-white">AskMyDocs</span>
+          <span className="text-xl font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            AskMyDocs
+          </span>
         </div>
 
-        <div className="bg-[#161616] border border-white/[0.08] rounded-2xl p-7">
-          <h1 className="text-base font-medium text-white mb-1">
-            {mode === 'login' ? '登录账户' : '创建账户'}
-          </h1>
-          <p className="text-xs text-white/35 mb-6">
-            {mode === 'login' ? '欢迎回来' : '开始使用 AskMyDocs'}
-          </p>
+        {/* Card */}
+        <div
+          className="rounded-2xl p-7 shadow-md"
+          style={{
+            background: 'var(--bg-panel)',
+            border: '1px solid var(--border)',
+            boxShadow: 'var(--shadow-md)',
+          }}
+        >
+          {/* Tab switcher */}
+          <div
+            className="flex rounded-xl p-0.5 mb-6"
+            style={{ background: 'var(--bg-hover)' }}
+          >
+            {(['login', 'register'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => switchMode(m)}
+                className="flex-1 py-1.5 rounded-lg text-sm font-medium transition-all duration-150"
+                style={
+                  mode === m
+                    ? {
+                        background: 'var(--bg-panel)',
+                        color: 'var(--text-primary)',
+                        boxShadow: 'var(--shadow-sm)',
+                      }
+                    : { color: 'var(--text-tertiary)' }
+                }
+              >
+                {m === 'login' ? '登录' : '注册'}
+              </button>
+            ))}
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-3">
+            {/* Email */}
             <div>
-              <label className="block text-xs text-white/50 mb-1.5">邮箱</label>
+              <label
+                className="block text-xs font-medium mb-1.5"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                邮箱
+              </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
                 required
-                className="w-full px-3 py-2.5 rounded-lg bg-white/[0.05] border border-white/[0.08] text-white text-sm placeholder-white/20 focus:outline-none focus:border-white/20 transition-colors"
+                autoComplete="email"
+                className={inputClass}
               />
             </div>
 
+            {/* Password */}
             <div>
-              <label className="block text-xs text-white/50 mb-1.5">密码</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                className="w-full px-3 py-2.5 rounded-lg bg-white/[0.05] border border-white/[0.08] text-white text-sm placeholder-white/20 focus:outline-none focus:border-white/20 transition-colors"
-              />
+              <label
+                className="block text-xs font-medium mb-1.5"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                密码
+              </label>
+              <div className="relative">
+                <input
+                  type={showPw ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  className={inputClass + ' pr-10'}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw(!showPw)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
+                  style={{ color: 'var(--text-tertiary)' }}
+                  tabIndex={-1}
+                >
+                  {showPw
+                    ? <EyeOff className="w-4 h-4" />
+                    : <Eye className="w-4 h-4" />
+                  }
+                </button>
+              </div>
             </div>
 
+            {/* Confirm password */}
             {mode === 'register' && (
-              <div className="animate-fade-in">
-                <label className="block text-xs text-white/50 mb-1.5">确认密码</label>
+              <div className="animate-slide-down">
+                <label
+                  className="block text-xs font-medium mb-1.5"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  确认密码
+                </label>
                 <input
-                  type="password"
+                  type={showPw ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="w-full px-3 py-2.5 rounded-lg bg-white/[0.05] border border-white/[0.08] text-white text-sm placeholder-white/20 focus:outline-none focus:border-white/20 transition-colors"
+                  autoComplete="new-password"
+                  className={inputClass}
                 />
               </div>
             )}
 
+            {/* Error */}
             {error && (
-              <div className="px-3 py-2.5 rounded-lg bg-red-500/8 border border-red-500/15 text-red-400 text-xs">
+              <div
+                className="px-3.5 py-2.5 rounded-xl text-xs animate-fade-in"
+                style={{
+                  background: 'var(--error-bg)',
+                  color: 'var(--error)',
+                  border: '1px solid var(--error-bg)',
+                }}
+              >
                 {error}
               </div>
             )}
@@ -111,24 +191,32 @@ export default function AuthPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 rounded-lg bg-white text-black text-sm font-medium hover:bg-white/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors mt-1"
+              className="w-full py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 mt-1 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98]"
+              style={{
+                background: 'var(--accent)',
+                color: 'var(--accent-fg)',
+              }}
             >
-              {loading ? '请稍候...' : mode === 'login' ? '登录' : '注册账号'}
+              {loading
+                ? '请稍候...'
+                : mode === 'login'
+                  ? '登录账户'
+                  : '创建账户'
+              }
             </button>
           </form>
-
-          <div className="mt-5 pt-5 border-t border-white/[0.06] text-center">
-            <span className="text-xs text-white/30">
-              {mode === 'login' ? '还没有账户？' : '已有账户？'}
-            </span>
-            <button
-              onClick={() => switchMode(mode === 'login' ? 'register' : 'login')}
-              className="text-xs text-white/60 hover:text-white ml-1 transition-colors"
-            >
-              {mode === 'login' ? '注册' : '登录'}
-            </button>
-          </div>
         </div>
+
+        <p className="text-center mt-4 text-xs" style={{ color: 'var(--text-disabled)' }}>
+          {mode === 'login' ? '还没有账户？' : '已有账户？'}
+          <button
+            onClick={() => switchMode(mode === 'login' ? 'register' : 'login')}
+            className="ml-1 font-medium underline underline-offset-2 transition-colors"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            {mode === 'login' ? '立即注册' : '去登录'}
+          </button>
+        </p>
       </div>
     </div>
   )

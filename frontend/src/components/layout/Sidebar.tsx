@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, FolderOpen, MessageSquare, ChevronDown, ChevronRight, BookOpen, LogOut, Settings, Search } from 'lucide-react'
+import {
+  Plus, Trash2, FolderOpen, MessageSquare, ChevronDown, ChevronRight,
+  BookOpen, LogOut, Settings, Search, X,
+} from 'lucide-react'
 import * as api from '../../api'
 import type { KnowledgeBase, Session } from '../../types'
 import { useAuth } from '../../hooks/useAuth'
@@ -14,7 +17,10 @@ interface Props {
   onSessionRenamed?: (session: Session) => void
 }
 
-export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSelectSession, onNewSession, onSessionRenamed }: Props) {
+export default function Sidebar({
+  selectedKb, selectedSession,
+  onSelectKb, onSelectSession, onNewSession, onSessionRenamed,
+}: Props) {
   const { user, logout } = useAuth()
   const [kbs, setKbs] = useState<KnowledgeBase[]>([])
   const [sessionsByKb, setSessionsByKb] = useState<Map<number, Session[]>>(new Map())
@@ -25,16 +31,12 @@ export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSel
   const [newKbDesc, setNewKbDesc] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
 
-  // 重命名会话状态
   const [renamingSessionId, setRenamingSessionId] = useState<number | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const renameInputRef = useRef<HTMLInputElement>(null)
 
   const loadKbs = async () => {
-    try {
-      const data = await api.listKBs()
-      setKbs(data)
-    } catch {}
+    try { setKbs(await api.listKBs()) } catch {}
   }
 
   const loadSessions = async (kbId: number) => {
@@ -89,18 +91,14 @@ export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSel
   }
 
   const handleDoubleClickSession = (e: React.MouseEvent, session: Session) => {
-    e.preventDefault()
-    e.stopPropagation()
+    e.preventDefault(); e.stopPropagation()
     setRenamingSessionId(session.id)
     setRenameValue(session.title)
   }
 
   const handleRenameSubmit = async (sessionId: number) => {
     const trimmed = renameValue.trim()
-    if (!trimmed) {
-      setRenamingSessionId(null)
-      return
-    }
+    if (!trimmed) { setRenamingSessionId(null); return }
     try {
       const updated = await api.renameSession(sessionId, trimmed)
       setSessionsByKb((prev) => {
@@ -147,39 +145,87 @@ export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSel
     } catch {}
   }
 
+  const q = searchQuery.trim().toLowerCase()
+  const filteredKbs = q
+    ? kbs.filter(
+        (kb) =>
+          kb.name.toLowerCase().includes(q) ||
+          (sessionsByKb.get(kb.id) ?? []).some((s) => s.title.toLowerCase().includes(q))
+      )
+    : kbs
+
+  const inputCls =
+    'w-full px-2.5 py-1.5 rounded-lg text-[12px] focus:outline-none transition-colors ' +
+    'placeholder:text-[color:var(--text-disabled)] text-[color:var(--text-primary)] ' +
+    'bg-[var(--bg-input)] border border-[var(--border)] focus:border-[var(--border-strong)]'
+
   return (
     <>
-      <aside className="w-64 flex-shrink-0 flex flex-col h-full bg-[#0f0f0f] border-r border-white/[0.06]">
+      <aside
+        className="w-[240px] flex-shrink-0 flex flex-col h-full"
+        style={{
+          background: 'var(--bg-sidebar)',
+          borderRight: '1px solid var(--border)',
+        }}
+      >
         {/* Logo */}
-        <div className="px-4 py-4 flex items-center gap-2.5 border-b border-white/[0.06]">
-          <div className="w-7 h-7 rounded-md bg-white flex items-center justify-center flex-shrink-0">
-            <BookOpen className="w-4 h-4 text-black" />
+        <div
+          className="px-4 py-[14px] flex items-center gap-2.5"
+          style={{ borderBottom: '1px solid var(--border)' }}
+        >
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ background: 'var(--accent)' }}
+          >
+            <BookOpen className="w-3.5 h-3.5" style={{ color: 'var(--accent-fg)' }} />
           </div>
-          <span className="font-semibold text-white text-sm">AskMyDocs</span>
+          <span
+            className="font-semibold text-[13.5px] tracking-tight"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            AskMyDocs
+          </span>
         </div>
 
         {/* Search */}
-        <div className="px-3 py-2 border-b border-white/[0.06]">
-          <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-white/[0.04] border border-white/[0.06]">
-            <Search className="w-3 h-3 text-white/25 flex-shrink-0" />
+        <div className="px-3 py-2.5" style={{ borderBottom: '1px solid var(--border)' }}>
+          <div
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-colors"
+            style={{ background: 'var(--bg-input)', border: '1px solid var(--border)' }}
+          >
+            <Search className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--text-disabled)' }} />
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="搜索知识库和会话..."
-              className="flex-1 bg-transparent text-white text-[12px] placeholder-white/20 focus:outline-none min-w-0"
+              placeholder="搜索..."
+              className="flex-1 bg-transparent text-[12px] focus:outline-none min-w-0"
+              style={{ color: 'var(--text-primary)' }}
             />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} style={{ color: 'var(--text-tertiary)' }}>
+                <X className="w-3 h-3" />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* KB list */}
-        <div className="flex-1 overflow-y-auto py-2">
+        {/* KB List */}
+        <div className="flex-1 overflow-y-auto py-1.5">
           {/* Section header */}
-          <div className="flex items-center justify-between px-3 py-2 mb-1">
-            <span className="text-[11px] font-medium text-white/30 uppercase tracking-widest">知识库</span>
+          <div className="flex items-center justify-between px-3.5 pb-1.5 pt-1">
+            <span
+              className="text-[10.5px] font-semibold uppercase tracking-widest"
+              style={{ color: 'var(--text-disabled)', letterSpacing: '0.08em' }}
+            >
+              知识库
+            </span>
             <button
               onClick={() => setCreating(!creating)}
-              className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/10 text-white/40 hover:text-white/80 transition-colors"
+              className="w-5 h-5 flex items-center justify-center rounded-md transition-colors"
+              style={{ color: 'var(--text-tertiary)' }}
               title="新建知识库"
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-active)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             >
               <Plus className="w-3.5 h-3.5" />
             </button>
@@ -187,31 +233,37 @@ export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSel
 
           {/* Create form */}
           {creating && (
-            <form onSubmit={handleCreateKb} className="mx-2 mb-2 p-3 rounded-lg bg-white/[0.04] border border-white/[0.08] space-y-2 animate-fade-in">
+            <form
+              onSubmit={handleCreateKb}
+              className="mx-2.5 mb-2 p-3 rounded-xl space-y-2 animate-slide-down"
+              style={{ background: 'var(--bg-hover)', border: '1px solid var(--border)' }}
+            >
               <input
                 autoFocus
                 value={newKbName}
                 onChange={(e) => setNewKbName(e.target.value)}
                 placeholder="知识库名称"
-                className="w-full px-2.5 py-1.5 rounded-md bg-white/[0.06] border border-white/[0.08] text-white text-xs placeholder-white/25 focus:outline-none focus:border-white/20 transition-colors"
+                className={inputCls}
               />
               <input
                 value={newKbDesc}
                 onChange={(e) => setNewKbDesc(e.target.value)}
                 placeholder="简介（可选）"
-                className="w-full px-2.5 py-1.5 rounded-md bg-white/[0.06] border border-white/[0.08] text-white text-xs placeholder-white/25 focus:outline-none focus:border-white/20 transition-colors"
+                className={inputCls}
               />
-              <div className="flex gap-2">
+              <div className="flex gap-1.5">
                 <button
                   type="submit"
-                  className="flex-1 py-1.5 rounded-md bg-white text-black text-xs font-medium hover:bg-white/90 transition-colors"
+                  className="flex-1 py-1.5 rounded-lg text-[12px] font-medium transition-colors"
+                  style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
                 >
                   创建
                 </button>
                 <button
                   type="button"
                   onClick={() => setCreating(false)}
-                  className="flex-1 py-1.5 rounded-md bg-white/[0.06] text-white/60 text-xs hover:bg-white/10 transition-colors"
+                  className="flex-1 py-1.5 rounded-lg text-[12px] transition-colors"
+                  style={{ background: 'var(--bg-active)', color: 'var(--text-secondary)' }}
                 >
                   取消
                 </button>
@@ -219,76 +271,121 @@ export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSel
             </form>
           )}
 
-          {(() => {
-            const q = searchQuery.trim().toLowerCase()
-            const filteredKbs = q
-              ? kbs.filter(
-                  (kb) =>
-                    kb.name.toLowerCase().includes(q) ||
-                    (sessionsByKb.get(kb.id) ?? []).some((s) => s.title.toLowerCase().includes(q))
-                )
-              : kbs
-            return filteredKbs.map((kb) => (
+          {/* KB items */}
+          {filteredKbs.map((kb) => (
             <div key={kb.id}>
-              <button
+              {/* KB row */}
+              <div
+                className="flex items-center gap-1.5 px-2.5 mx-1 my-0.5 rounded-lg transition-colors cursor-pointer group"
+                style={{
+                  background: selectedKb?.id === kb.id ? 'var(--bg-active)' : 'transparent',
+                  color: selectedKb?.id === kb.id ? 'var(--text-primary)' : 'var(--text-secondary)',
+                }}
                 onClick={() => handleSelectKb(kb)}
-                className={`w-full flex items-center gap-2 px-3 py-2 mx-0 transition-colors group ${
-                  selectedKb?.id === kb.id
-                    ? 'bg-white/[0.08] text-white'
-                    : 'text-white/55 hover:text-white/85 hover:bg-white/[0.04]'
-                }`}
+                onMouseEnter={(e) => {
+                  if (selectedKb?.id !== kb.id)
+                    e.currentTarget.style.background = 'var(--bg-hover)'
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedKb?.id !== kb.id)
+                    e.currentTarget.style.background = 'transparent'
+                }}
               >
-                {expandedKb === kb.id
-                  ? <ChevronDown className="w-3.5 h-3.5 flex-shrink-0 text-white/30" />
-                  : <ChevronRight className="w-3.5 h-3.5 flex-shrink-0 text-white/30" />
-                }
-                <FolderOpen className="w-3.5 h-3.5 flex-shrink-0 text-white/50" />
-                <span className="flex-1 text-[13px] text-left truncate">{kb.name}</span>
-                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5">
+                <span className="flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center" style={{ color: 'var(--text-tertiary)' }}>
+                  {expandedKb === kb.id
+                    ? <ChevronDown className="w-3 h-3" />
+                    : <ChevronRight className="w-3 h-3" />
+                  }
+                </span>
+                <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+                <span className="flex-1 text-[13px] text-left truncate py-1.5 font-medium">
+                  {kb.name}
+                </span>
+                {/* Actions (hover) */}
+                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-opacity">
                   <button
                     onClick={(e) => { e.stopPropagation(); setDocModalKb(kb) }}
-                    className="p-1 rounded hover:bg-white/10 text-white/40 hover:text-white/80 transition-colors"
+                    className="p-1 rounded-md transition-colors"
+                    style={{ color: 'var(--text-tertiary)' }}
                     title="管理文档"
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-active)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
                     <Settings className="w-3 h-3" />
                   </button>
                   <button
                     onClick={(e) => handleDeleteKb(e, kb.id)}
-                    className="p-1 rounded hover:bg-red-500/15 text-white/40 hover:text-red-400 transition-colors"
+                    className="p-1 rounded-md transition-colors"
+                    style={{ color: 'var(--text-tertiary)' }}
                     title="删除知识库"
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--error-bg)'
+                      e.currentTarget.style.color = 'var(--error)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent'
+                      e.currentTarget.style.color = 'var(--text-tertiary)'
+                    }}
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
                 </div>
-              </button>
+              </div>
 
-              {/* Sessions under this KB */}
+              {/* Sessions */}
               {expandedKb === kb.id && (
-                <div className="ml-6 border-l border-white/[0.06]">
+                <div
+                  className="ml-5 mr-1 mb-1"
+                  style={{ borderLeft: '1px solid var(--border)' }}
+                >
+                  {/* New session button */}
                   <button
                     onClick={() => handleNewSession(kb)}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-white/30 hover:text-white/60 hover:bg-white/[0.04] transition-colors text-[12px]"
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] transition-colors rounded-lg mx-0.5"
+                    style={{ color: 'var(--text-tertiary)' }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--bg-hover)'
+                      e.currentTarget.style.color = 'var(--text-secondary)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent'
+                      e.currentTarget.style.color = 'var(--text-tertiary)'
+                    }}
                   >
                     <Plus className="w-3 h-3" />
                     <span>新建会话</span>
                   </button>
+
+                  {/* Session items */}
                   {(sessionsByKb.get(kb.id) ?? [])
-                    .filter((s) => {
-                      const q = searchQuery.trim().toLowerCase()
-                      return !q || s.title.toLowerCase().includes(q)
-                    })
+                    .filter((s) => !q || s.title.toLowerCase().includes(q))
                     .map((session) => (
                       <div
                         key={session.id}
                         onClick={() => renamingSessionId !== session.id && onSelectSession(session)}
                         onDoubleClick={(e) => handleDoubleClickSession(e, session)}
-                        className={`w-full flex items-center gap-2 px-3 py-1.5 transition-colors group text-left cursor-pointer ${
-                          selectedSession?.id === session.id
-                            ? 'bg-white/[0.08] text-white/90'
-                            : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
-                        }`}
+                        className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg mx-0.5 transition-colors group cursor-pointer"
+                        style={{
+                          background:
+                            selectedSession?.id === session.id
+                              ? 'var(--bg-active)'
+                              : 'transparent',
+                          color:
+                            selectedSession?.id === session.id
+                              ? 'var(--text-primary)'
+                              : 'var(--text-tertiary)',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (selectedSession?.id !== session.id)
+                            e.currentTarget.style.background = 'var(--bg-hover)'
+                        }}
+                        onMouseLeave={(e) => {
+                          if (selectedSession?.id !== session.id)
+                            e.currentTarget.style.background = 'transparent'
+                        }}
                       >
-                        <MessageSquare className="w-3 h-3 flex-shrink-0 text-white/30 shrink-0" />
+                        <MessageSquare className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--text-disabled)' }} />
+
                         {renamingSessionId === session.id ? (
                           <input
                             ref={renameInputRef}
@@ -297,14 +394,31 @@ export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSel
                             onBlur={() => handleRenameSubmit(session.id)}
                             onKeyDown={(e) => handleRenameKeyDown(e, session.id)}
                             onClick={(e) => e.stopPropagation()}
-                            className="flex-1 text-[12px] bg-white/[0.08] text-white border border-white/20 rounded px-1 py-0.5 focus:outline-none min-w-0"
+                            className="flex-1 text-[12px] rounded px-1 py-0.5 focus:outline-none min-w-0"
+                            style={{
+                              background: 'var(--bg-input)',
+                              border: '1px solid var(--border-strong)',
+                              color: 'var(--text-primary)',
+                            }}
                           />
                         ) : (
-                          <span className="flex-1 text-[12px] truncate" title="双击重命名">{session.title}</span>
+                          <span className="flex-1 text-[12px] truncate font-medium" title="双击重命名">
+                            {session.title}
+                          </span>
                         )}
+
                         <button
                           onClick={(e) => handleDeleteSession(e, session.id, kb.id)}
-                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-red-500/15 hover:text-red-400 text-white/30 transition-colors shrink-0"
+                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded transition-colors shrink-0"
+                          style={{ color: 'var(--text-tertiary)' }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'var(--error-bg)'
+                            e.currentTarget.style.color = 'var(--error)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'transparent'
+                            e.currentTarget.style.color = 'var(--text-tertiary)'
+                          }}
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>
@@ -313,28 +427,45 @@ export default function Sidebar({ selectedKb, selectedSession, onSelectKb, onSel
                 </div>
               )}
             </div>
-            ))
-          })()}
+          ))}
 
+          {/* Empty state */}
           {kbs.length === 0 && !creating && (
-            <div className="text-center py-10 text-white/20 text-xs">
-              <FolderOpen className="w-7 h-7 mx-auto mb-2 opacity-30" />
-              <p>暂无知识库</p>
-              <p className="mt-1 opacity-70">点击 + 新建</p>
+            <div
+              className="flex flex-col items-center justify-center py-12 text-center px-4"
+              style={{ color: 'var(--text-disabled)' }}
+            >
+              <FolderOpen className="w-8 h-8 mb-3 opacity-40" />
+              <p className="text-[12px] font-medium">暂无知识库</p>
+              <p className="text-[11px] mt-1 opacity-70">点击上方 + 创建</p>
             </div>
           )}
         </div>
 
         {/* User footer */}
-        <div className="border-t border-white/[0.06] p-3">
-          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.05] transition-colors group cursor-pointer" onClick={logout}>
-            <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
-              <span className="text-[10px] text-white/60 font-medium uppercase">
-                {user?.email?.[0] || 'U'}
-              </span>
+        <div className="p-2.5" style={{ borderTop: '1px solid var(--border)' }}>
+          <div
+            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer group transition-colors"
+            onClick={logout}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          >
+            <div
+              className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-semibold uppercase"
+              style={{ background: 'var(--bg-active)', color: 'var(--text-secondary)' }}
+            >
+              {user?.email?.[0] || 'U'}
             </div>
-            <span className="flex-1 text-[12px] text-white/40 truncate">{user?.email}</span>
-            <LogOut className="w-3.5 h-3.5 text-white/20 group-hover:text-white/50 transition-colors" />
+            <span
+              className="flex-1 text-[12px] truncate font-medium"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
+              {user?.email}
+            </span>
+            <LogOut
+              className="w-3.5 h-3.5 transition-colors"
+              style={{ color: 'var(--text-disabled)' }}
+            />
           </div>
         </div>
       </aside>

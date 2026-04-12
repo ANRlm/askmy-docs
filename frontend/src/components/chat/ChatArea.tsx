@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Mic, MicOff, Volume2, VolumeX, ChevronDown, ChevronRight, FileText, Square, ArrowUp, Loader2, ThumbsUp, ThumbsDown } from 'lucide-react'
+import {
+  Mic, MicOff, Volume2, VolumeX, ChevronDown, ChevronRight,
+  FileText, Square, ArrowUp, Loader2, ThumbsUp, ThumbsDown,
+} from 'lucide-react'
 import * as api from '../../api'
 import type { Message, Session, KnowledgeBase, Source } from '../../types'
 import { useRecorder } from '../../hooks/useRecorder'
@@ -11,30 +14,51 @@ interface Props {
   session: Session | null
 }
 
+/* ── Source citations ── */
 function SourceList({ sources }: { sources: Source[] }) {
   const [open, setOpen] = useState(false)
   if (!sources.length) return null
   return (
-    <div className="mt-2">
+    <div className="mt-3">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 text-xs text-white/30 hover:text-white/55 transition-colors"
+        className="flex items-center gap-1.5 text-[11px] transition-colors"
+        style={{ color: 'var(--text-disabled)' }}
+        onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text-tertiary)')}
+        onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-disabled)')}
       >
         {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
         <FileText className="w-3 h-3" />
         <span>{sources.length} 条参考来源</span>
       </button>
       {open && (
-        <div className="mt-2 space-y-1 animate-fade-in">
+        <div className="mt-2 space-y-1.5 animate-fade-in">
           {sources.map((s, i) => (
-            <div key={i} className="px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs">
+            <div
+              key={i}
+              className="px-3 py-2 rounded-xl text-[12px]"
+              style={{
+                background: 'var(--bg-hover)',
+                border: '1px solid var(--border)',
+              }}
+            >
               <div className="flex items-center justify-between mb-1">
-                <span className="text-white/70 font-medium truncate max-w-xs">{s.filename}</span>
-                <span className="text-white/25 ml-2 flex-shrink-0">
-                  片段 #{s.chunk_index} · {(s.score * 100).toFixed(0)}%
+                <span
+                  className="font-medium truncate max-w-xs"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  {s.filename}
+                </span>
+                <span className="ml-2 flex-shrink-0 text-[10px]" style={{ color: 'var(--text-disabled)' }}>
+                  #{s.chunk_index} · {(s.score * 100).toFixed(0)}%
                 </span>
               </div>
-              <p className="text-white/40 leading-relaxed line-clamp-3">{s.text}</p>
+              <p
+                className="leading-relaxed line-clamp-3 text-[11px]"
+                style={{ color: 'var(--text-tertiary)' }}
+              >
+                {s.text}
+              </p>
             </div>
           ))}
         </div>
@@ -43,6 +67,7 @@ function SourceList({ sources }: { sources: Source[] }) {
   )
 }
 
+/* ── TTS button ── */
 function TtsButton({ text }: { text: string }) {
   const [loading, setLoading] = useState(false)
   const [playing, setPlaying] = useState(false)
@@ -71,8 +96,17 @@ function TtsButton({ text }: { text: string }) {
     <button
       onClick={toggle}
       disabled={loading}
-      className="flex items-center gap-1 px-2 py-1 rounded text-[11px] text-white/30 hover:text-white/60 hover:bg-white/[0.05] transition-colors"
+      className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] transition-colors"
+      style={{ color: 'var(--text-disabled)' }}
       title={playing ? '停止播放' : '语音播放'}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = 'var(--bg-hover)'
+        e.currentTarget.style.color = 'var(--text-tertiary)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'transparent'
+        e.currentTarget.style.color = 'var(--text-disabled)'
+      }}
     >
       {loading
         ? <Loader2 className="w-3 h-3 animate-spin" />
@@ -85,6 +119,7 @@ function TtsButton({ text }: { text: string }) {
   )
 }
 
+/* ── Feedback buttons ── */
 function FeedbackButtons({ dbId }: { dbId: number }) {
   const [voted, setVoted] = useState<1 | -1 | null>(null)
 
@@ -101,24 +136,48 @@ function FeedbackButtons({ dbId }: { dbId: number }) {
       <button
         onClick={() => handleVote(1)}
         disabled={voted !== null}
-        className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] transition-colors disabled:cursor-default ${
-          voted === 1
-            ? 'text-emerald-400 bg-emerald-500/10'
-            : 'text-white/30 hover:text-white/60 hover:bg-white/[0.05]'
-        }`}
+        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] transition-colors disabled:cursor-default"
+        style={{
+          background: voted === 1 ? 'var(--success-bg)' : 'transparent',
+          color: voted === 1 ? 'var(--success)' : 'var(--text-disabled)',
+        }}
         title="有帮助"
+        onMouseEnter={(e) => {
+          if (voted === null) {
+            e.currentTarget.style.background = 'var(--bg-hover)'
+            e.currentTarget.style.color = 'var(--text-tertiary)'
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (voted !== 1) {
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.color = 'var(--text-disabled)'
+          }
+        }}
       >
         <ThumbsUp className="w-3 h-3" />
       </button>
       <button
         onClick={() => handleVote(-1)}
         disabled={voted !== null}
-        className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] transition-colors disabled:cursor-default ${
-          voted === -1
-            ? 'text-red-400 bg-red-500/10'
-            : 'text-white/30 hover:text-white/60 hover:bg-white/[0.05]'
-        }`}
+        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] transition-colors disabled:cursor-default"
+        style={{
+          background: voted === -1 ? 'var(--error-bg)' : 'transparent',
+          color: voted === -1 ? 'var(--error)' : 'var(--text-disabled)',
+        }}
         title="没有帮助"
+        onMouseEnter={(e) => {
+          if (voted === null) {
+            e.currentTarget.style.background = 'var(--bg-hover)'
+            e.currentTarget.style.color = 'var(--text-tertiary)'
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (voted !== -1) {
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.color = 'var(--text-disabled)'
+          }
+        }}
       >
         <ThumbsDown className="w-3 h-3" />
       </button>
@@ -126,45 +185,72 @@ function FeedbackButtons({ dbId }: { dbId: number }) {
   )
 }
 
+/* ── Message bubble ── */
 function MessageBubble({ msg }: { msg: Message }) {
   const isUser = msg.role === 'user'
+
   if (isUser) {
     return (
       <div className="flex justify-end animate-slide-up">
-        <div className="max-w-[70%] px-4 py-2.5 rounded-2xl rounded-tr-sm bg-white text-black text-sm leading-relaxed">
+        <div
+          className="max-w-[72%] px-4 py-3 rounded-2xl rounded-tr-md text-sm leading-relaxed"
+          style={{
+            background: 'var(--accent)',
+            color: 'var(--accent-fg)',
+          }}
+        >
           <p className="whitespace-pre-wrap">{msg.content}</p>
         </div>
       </div>
     )
   }
+
   return (
     <div className="flex gap-3 animate-slide-up">
-      <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-        <span className="text-[10px] text-white/60 font-bold">AI</span>
+      {/* Avatar */}
+      <div
+        className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 text-[10px] font-bold"
+        style={{
+          background: 'var(--bg-active)',
+          color: 'var(--text-tertiary)',
+        }}
+      >
+        AI
       </div>
+
       <div className="flex-1 min-w-0">
-        <div className="text-sm text-white/85 leading-relaxed">
-          <div className="prose prose-invert prose-sm max-w-none">
+        <div
+          className="text-sm leading-relaxed"
+          style={{ color: 'var(--text-primary)' }}
+        >
+          <div className="prose prose-sm max-w-none">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
             {msg.streaming && (
-              <span className="inline-flex gap-1 ml-1">
+              <span className="inline-flex gap-1 ml-1 align-middle">
                 {[0, 1, 2].map((i) => (
                   <span
                     key={i}
-                    className="w-1 h-1 bg-white/50 rounded-full inline-block animate-pulse-dot"
-                    style={{ animationDelay: `${i * 0.16}s` }}
+                    className="w-1.5 h-1.5 rounded-full inline-block animate-pulse-dot"
+                    style={{
+                      background: 'var(--text-tertiary)',
+                      animationDelay: `${i * 0.18}s`,
+                    }}
                   />
                 ))}
               </span>
             )}
           </div>
         </div>
+
+        {/* Actions bar */}
         {!msg.streaming && (
-          <div className="flex items-center gap-1 mt-2">
+          <div className="flex items-center gap-0.5 mt-2">
             <TtsButton text={msg.content} />
             {msg.db_id && <FeedbackButtons dbId={msg.db_id} />}
           </div>
         )}
+
+        {/* Sources */}
         {!msg.streaming && msg.sources && msg.sources.length > 0 && (
           <SourceList sources={msg.sources} />
         )}
@@ -172,6 +258,28 @@ function MessageBubble({ msg }: { msg: Message }) {
     </div>
   )
 }
+
+/* ── Typing indicator (for initial load) ── */
+function EmptyChat({ kb }: { kb: KnowledgeBase | null }) {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center" style={{ color: 'var(--text-disabled)' }}>
+      <div
+        className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4 text-lg font-bold"
+        style={{ background: 'var(--bg-hover)', color: 'var(--text-tertiary)' }}
+      >
+        AI
+      </div>
+      <p className="text-sm font-medium" style={{ color: 'var(--text-tertiary)' }}>
+        {kb ? '选择或新建会话' : '请先选择知识库'}
+      </p>
+      <p className="text-[12px] mt-1">
+        {kb ? `当前知识库：${kb.name}` : '在左侧选择知识库，然后新建会话'}
+      </p>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────── */
 
 let msgId = 0
 const nextId = () => String(++msgId)
@@ -185,13 +293,11 @@ export default function ChatArea({ kb, session }: Props) {
   const stopRef = useRef<(() => void) | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  // ref 持有 session / streaming 最新值，供 stt 回调使用（避免闭包过期）
   const sessionRef = useRef(session)
   const streamingRef = useRef(streaming)
   useEffect(() => { sessionRef.current = session }, [session])
   useEffect(() => { streamingRef.current = streaming }, [streaming])
 
-  // 核心发送函数，接受显式 text 参数，避免依赖 input state 的闭包问题
   const doSend = useCallback((text: string) => {
     const sess = sessionRef.current
     if (!text.trim() || !sess || streamingRef.current) return
@@ -208,17 +314,26 @@ export default function ChatArea({ kb, session }: Props) {
     streamingRef.current = true
 
     const stop = api.chatStream(
-      sess.id,
-      text,
-      (chunk) => setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: m.content + chunk } : m)),
-      (sources) => setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, sources } : m)),
+      sess.id, text,
+      (chunk) =>
+        setMessages((prev) =>
+          prev.map((m) => m.id === assistantId ? { ...m, content: m.content + chunk } : m)
+        ),
+      (sources) =>
+        setMessages((prev) =>
+          prev.map((m) => m.id === assistantId ? { ...m, sources } : m)
+        ),
       (dbMessageId) => {
-        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, streaming: false, db_id: dbMessageId } : m))
+        setMessages((prev) =>
+          prev.map((m) => m.id === assistantId ? { ...m, streaming: false, db_id: dbMessageId } : m)
+        )
         setStreaming(false)
         streamingRef.current = false
       },
       (err) => {
-        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: `错误: ${err}`, streaming: false } : m))
+        setMessages((prev) =>
+          prev.map((m) => m.id === assistantId ? { ...m, content: `错误: ${err}`, streaming: false } : m)
+        )
         setStreaming(false)
         streamingRef.current = false
       },
@@ -226,7 +341,6 @@ export default function ChatArea({ kb, session }: Props) {
     stopRef.current = stop
   }, [])
 
-  // 语音识别完成回调：识别结果直接发送
   const { recording, error: micError, startRecording, stopRecording } = useRecorder(async (blob, ext) => {
     setSttLoading(true)
     setSttError(null)
@@ -262,10 +376,7 @@ export default function ChatArea({ kb, session }: Props) {
   const handleSend = () => doSend(input)
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
   }
 
   const handleStop = () => {
@@ -284,38 +395,43 @@ export default function ChatArea({ kb, session }: Props) {
 
   if (!session) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-[#111111]">
-        <div className="text-center text-white/20">
-          <div className="w-12 h-12 rounded-2xl bg-white/[0.05] flex items-center justify-center mx-auto mb-4">
-            <span className="text-white/30 font-bold text-lg">AI</span>
-          </div>
-          <p className="text-sm font-medium text-white/40">
-            {kb ? '选择或新建会话' : '请先选择知识库'}
-          </p>
-          <p className="text-xs mt-1 text-white/20">
-            {kb ? `当前知识库：${kb.name}` : '在左侧选择知识库，然后新建会话'}
-          </p>
-        </div>
+      <div className="flex-1 flex flex-col" style={{ background: 'var(--bg-panel)' }}>
+        <EmptyChat kb={kb} />
       </div>
     )
   }
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 h-full bg-[#111111]">
+    <div className="flex-1 flex flex-col min-w-0 h-full" style={{ background: 'var(--bg-panel)' }}>
       {/* Header */}
-      <div className="px-6 py-3 border-b border-white/[0.06] flex items-center gap-3 flex-shrink-0 bg-[#111111]">
-        <div className="w-2 h-2 rounded-full bg-emerald-500" />
-        <div>
-          <h2 className="text-sm font-medium text-white/85">{session.title}</h2>
-          <p className="text-[11px] text-white/30">{kb?.name}</p>
+      <div
+        className="px-6 py-3.5 flex items-center gap-3 flex-shrink-0"
+        style={{ borderBottom: '1px solid var(--border)' }}
+      >
+        <div
+          className="w-2 h-2 rounded-full flex-shrink-0"
+          style={{ background: 'var(--success)' }}
+        />
+        <div className="min-w-0">
+          <h2
+            className="text-sm font-semibold truncate"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {session.title}
+          </h2>
+          <p className="text-[11px]" style={{ color: 'var(--text-disabled)' }}>
+            {kb?.name}
+          </p>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 max-w-3xl w-full mx-auto">
+      <div className="flex-1 overflow-y-auto px-6 py-8 space-y-7 max-w-3xl w-full mx-auto">
         {messages.length === 0 && (
-          <div className="text-center text-white/20 mt-20">
-            <p className="text-sm">向 AI 提问，从知识库中检索相关内容来回答</p>
+          <div className="text-center mt-16">
+            <p className="text-sm" style={{ color: 'var(--text-disabled)' }}>
+              向 AI 提问，从知识库中检索相关内容来回答
+            </p>
           </div>
         )}
         {messages.map((msg) => (
@@ -324,11 +440,26 @@ export default function ChatArea({ kb, session }: Props) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div className="px-4 pb-5 pt-3 flex-shrink-0 max-w-3xl w-full mx-auto">
-        <div className={`relative flex flex-col bg-[#1c1c1c] border rounded-2xl transition-colors ${
-          recording ? 'border-red-500/40' : 'border-white/[0.1] focus-within:border-white/20'
-        }`}>
+      {/* Input area */}
+      <div className="px-4 pb-5 pt-2 flex-shrink-0 max-w-3xl w-full mx-auto">
+        <div
+          className="relative flex flex-col rounded-2xl transition-all duration-200"
+          style={{
+            background: 'var(--bg-elevated)',
+            border: `1px solid ${recording ? 'var(--error)' : 'var(--border)'}`,
+            boxShadow: 'var(--shadow-sm)',
+          }}
+          onFocusCapture={(e) => {
+            const el = e.currentTarget as HTMLDivElement
+            el.style.borderColor = recording ? 'var(--error)' : 'var(--border-strong)'
+            el.style.boxShadow = 'var(--shadow-md)'
+          }}
+          onBlurCapture={(e) => {
+            const el = e.currentTarget as HTMLDivElement
+            el.style.borderColor = recording ? 'var(--error)' : 'var(--border)'
+            el.style.boxShadow = 'var(--shadow-sm)'
+          }}
+        >
           <textarea
             ref={textareaRef}
             value={input}
@@ -343,22 +474,30 @@ export default function ChatArea({ kb, session }: Props) {
             }
             rows={1}
             disabled={recording || sttLoading}
-            className="w-full resize-none bg-transparent text-white/85 placeholder-white/25 text-sm focus:outline-none leading-relaxed px-4 pt-3 pb-2 disabled:opacity-50"
-            style={{ maxHeight: '160px' }}
+            className="w-full resize-none bg-transparent text-sm focus:outline-none leading-relaxed px-4 pt-3.5 pb-2 disabled:opacity-50"
+            style={{
+              color: 'var(--text-primary)',
+              maxHeight: '160px',
+            }}
           />
-          <div className="flex items-center justify-between px-3 pb-2.5">
+
+          <div className="flex items-center justify-between px-3 pb-3">
             {/* Mic button */}
             <button
               onClick={recording ? stopRecording : startRecording}
               disabled={sttLoading || streaming}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                recording
-                  ? 'bg-red-500/15 text-red-400 hover:bg-red-500/20'
-                  : sttLoading
-                    ? 'text-white/30'
-                    : 'text-white/30 hover:text-white/60 hover:bg-white/[0.06]'
-              }`}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                background: recording ? 'var(--error-bg)' : 'transparent',
+                color: recording ? 'var(--error)' : 'var(--text-tertiary)',
+              }}
               title={recording ? '再次点击结束录音，自动发送' : '语音输入（识别后自动发送）'}
+              onMouseEnter={(e) => {
+                if (!recording) e.currentTarget.style.background = 'var(--bg-hover)'
+              }}
+              onMouseLeave={(e) => {
+                if (!recording) e.currentTarget.style.background = 'transparent'
+              }}
             >
               {sttLoading
                 ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -366,17 +505,18 @@ export default function ChatArea({ kb, session }: Props) {
                   ? <MicOff className="w-3.5 h-3.5" />
                   : <Mic className="w-3.5 h-3.5" />
               }
-              <span>
-                {sttLoading ? '识别中...' : recording ? '点击结束' : '语音'}
-              </span>
+              <span>{sttLoading ? '识别中...' : recording ? '点击结束' : '语音'}</span>
             </button>
 
             {/* Send / Stop */}
             {streaming ? (
               <button
                 onClick={handleStop}
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10 text-white/60 hover:bg-white/15 transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-xl transition-colors"
+                style={{ background: 'var(--bg-active)', color: 'var(--text-secondary)' }}
                 title="停止生成"
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--border-strong)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-active)')}
               >
                 <Square className="w-3.5 h-3.5" />
               </button>
@@ -384,7 +524,8 @@ export default function ChatArea({ kb, session }: Props) {
               <button
                 onClick={handleSend}
                 disabled={!input.trim() || sttLoading || recording}
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white text-black hover:bg-white/90 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-xl transition-all disabled:opacity-25 disabled:cursor-not-allowed active:scale-90"
+                style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
                 title="发送"
               >
                 <ArrowUp className="w-4 h-4" />
@@ -392,9 +533,11 @@ export default function ChatArea({ kb, session }: Props) {
             )}
           </div>
         </div>
-        <p className="text-center text-[11px] text-white/15 mt-2">
+
+        {/* Status line */}
+        <p className="text-center text-[11px] mt-2" style={{ color: 'var(--text-disabled)' }}>
           {(micError || sttError)
-            ? <span className="text-red-400/80">{micError || sttError}</span>
+            ? <span style={{ color: 'var(--error)' }}>{micError || sttError}</span>
             : 'AI 回答基于知识库内容，仅供参考'
           }
         </p>

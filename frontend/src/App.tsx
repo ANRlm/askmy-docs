@@ -18,13 +18,8 @@ export default function App() {
     setSelectedSession(null)
   }
 
-  const handleSelectSession = (session: Session) => {
-    setSelectedSession(session)
-  }
-
-  const handleNewSession = (session: Session) => {
-    setSelectedSession(session)
-  }
+  const handleSelectSession = (session: Session) => setSelectedSession(session)
+  const handleNewSession = (session: Session) => setSelectedSession(session)
 
   const handleSessionRenamed = (session: Session) => {
     if (selectedSession?.id === session.id) {
@@ -34,7 +29,7 @@ export default function App() {
 
   return (
     <ToastProvider>
-      <div className="h-screen flex overflow-hidden bg-[#0a0a0a]">
+      <div className="h-screen flex overflow-hidden" style={{ background: 'var(--bg-base)' }}>
         <Sidebar
           selectedKb={selectedKb}
           selectedSession={selectedSession}
