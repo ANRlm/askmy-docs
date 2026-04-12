@@ -12,7 +12,7 @@ async def chat_completion(messages: list[dict], stream: bool = False):
             model=settings.llm_model,
             messages=messages,
             stream=stream,
-            max_tokens=1000,
+            max_tokens=3000,
         )
         return response
     except Exception as e:
@@ -27,8 +27,8 @@ async def chat_completion_stream(messages: list[dict]) -> AsyncGenerator[str, No
             model=settings.llm_model,
             messages=messages,
             stream=True,
-            max_tokens=1000,
-            timeout=60.0,
+            max_tokens=3000,
+            timeout=120.0,
         )
         async for chunk in stream:
             if chunk.choices and chunk.choices[0].delta.content:
