@@ -11,7 +11,7 @@ function authHeaders(): HeadersInit {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit & { signal?: AbortSignal }): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
     headers: {
@@ -19,6 +19,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...authHeaders(),
       ...init?.headers,
     },
+    signal: init?.signal,
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
@@ -89,8 +90,8 @@ export async function deleteDocument(kbId: number, docId: number): Promise<void>
 }
 
 // Sessions
-export async function listSessions(kbId: number): Promise<Session[]> {
-  return request(`/kb/${kbId}/sessions`)
+export async function listSessions(kbId: number, signal?: AbortSignal): Promise<Session[]> {
+  return request(`/kb/${kbId}/sessions`, { signal })
 }
 
 export async function createSession(kbId: number, title?: string): Promise<Session> {

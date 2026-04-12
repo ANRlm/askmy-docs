@@ -1,11 +1,14 @@
 import asyncio
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import AsyncGenerator
 from chroma_client import get_collection
 from services.embedding_service import get_embedding
 from services.llm_service import chat_completion_stream, simple_chat
 from services.memory_service import compress_history
 from loguru import logger
+
+_chroma_executor = ThreadPoolExecutor(max_workers=10)
 
 SYSTEM_PROMPT = """你是一个知识库问答助手。请根据以下参考资料回答用户的问题。
 回答时必须在末尾列出引用来源（格式：[来源：文件名，第X段]）。
@@ -19,16 +22,18 @@ KEEP_RECENT_ROUNDS = 3
 
 
 async def retrieve_chunks(kb_id: int, query: str, top_k: int = 5) -> list[dict]:
-    """从 Chroma 检索最相关的文本片段（运行在线程池避免阻塞事件循环）"""
+    """从 Chroma 检索最相关的文本片段（运行在受限线程池避免阻塞事件循环）"""
     query_embedding = await get_embedding(query)
     collection = get_collection(kb_id)
-    # chromadb 的 HttpClient 是同步的，必须在线程中执行避免阻塞事件循环
-    results = await asyncio.to_thread(
-        collection.query,
-        query_embeddings=[query_embedding],
-        n_results=top_k,
-        include=["documents", "metadatas", "distances"],
-    )
+
+    def _query():
+        return collection.query(
+            query_embeddings=[query_embedding],
+            n_results=top_k,
+            include=["documents", "metadatas", "distances"],
+        )
+
+    results = await asyncio.run_in_executor(_chroma_executor, _query)
 
     chunks = []
     if results and results["documents"]:

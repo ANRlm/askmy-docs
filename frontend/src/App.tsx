@@ -3,14 +3,27 @@ import { useAuth } from './hooks/useAuth'
 import AuthPage from './components/auth/AuthPage'
 import Sidebar from './components/layout/Sidebar'
 import ChatArea from './components/chat/ChatArea'
-import { ToastProvider } from './components/ui/Toast'
+import { ToastProvider, useToast } from './components/ui/Toast'
+import CommandPalette from './components/ui/CommandPalette'
+import { useCommandPalette } from './hooks/useCommandPalette'
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
+import type { CommandItem } from './components/ui/CommandPalette'
 import type { KnowledgeBase, Session, Message, Source } from './types'
 import * as api from './api'
+import { Plus, MessageSquare, FolderOpen, Trash2, BookOpen } from 'lucide-react'
 
-export default function App() {
+function AppInner() {
   const { token } = useAuth()
+  const { toast } = useToast()
+  const { commandPaletteOpen, openCommandPalette, closeCommandPalette } = useCommandPalette()
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [commandPaletteItems, setCommandPaletteItems] = useState<CommandItem[]>([])
   const [selectedKb, setSelectedKb] = useState<KnowledgeBase | null>(null)
   const [selectedSession, setSelectedSession] = useState<Session | null>(null)
+
+  // Keep a stable ref to toast to avoid loadCommandPaletteItems recreating on every render
+  const toastRef = useRef(toast)
+  toastRef.current = toast
 
   // Messages stored per session — switching sessions preserves in-progress streams
   const [messagesBySession, setMessagesBySession] = useState<Map<number, Message[]>>(new Map())
@@ -23,6 +36,94 @@ export default function App() {
   // Accumulated streaming content per session — avoids new Map() on every SSE chunk
   const streamingAccumRef = useRef<Map<number, { content: string; sources: Source[] | null }>>(new Map())
   const flushTimerRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map())
+
+  // Load KBs/sessions for command palette
+  const loadCommandPaletteItems = useCallback(async () => {
+    try {
+      const kbs = await api.listKBs()
+      const items: CommandItem[] = [
+        {
+          id: 'cmd-new-session',
+          label: '新建会话',
+          sublabel: selectedKb?.name,
+          icon: <Plus className="w-3.5 h-3.5" />,
+          action: () => {
+            if (selectedKb) {
+              api.createSession(selectedKb.id).then(handleNewSession).catch((e) => toastRef.current(e.message, 'error'))
+            }
+          },
+          category: 'action',
+        },
+        {
+          id: 'cmd-clear-messages',
+          label: '清空当前会话',
+          icon: <Trash2 className="w-3.5 h-3.5" />,
+          action: () => {
+            if (selectedSession) {
+              setMessagesBySession((prev) => {
+                const next = new Map(prev)
+                next.delete(selectedSession.id)
+                return next
+              })
+              toastRef.current('会话已清空', 'success')
+            }
+          },
+          category: 'action',
+        },
+        {
+          id: 'cmd-toggle-sidebar',
+          label: sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏',
+          icon: <BookOpen className="w-3.5 h-3.5" />,
+          action: () => setSidebarCollapsed((c) => !c),
+          category: 'action',
+        },
+      ]
+
+      for (const kb of kbs) {
+        items.push({
+          id: `kb-${kb.id}`,
+          label: kb.name,
+          sublabel: '知识库',
+          icon: <FolderOpen className="w-3.5 h-3.5" />,
+          action: () => handleSelectKb(kb),
+          category: 'kb',
+        })
+        try {
+          const sessions = await api.listSessions(kb.id)
+          for (const session of sessions) {
+            items.push({
+              id: `session-${session.id}`,
+              label: session.title,
+              sublabel: kb.name,
+              icon: <MessageSquare className="w-3.5 h-3.5" />,
+              action: () => {
+                handleSelectKb(kb)
+                setTimeout(() => handleSelectSession(session), 50)
+              },
+              category: 'session',
+            })
+          }
+        } catch {}
+      }
+
+      setCommandPaletteItems(items)
+    } catch {}
+  }, [selectedKb, selectedSession, sidebarCollapsed])
+
+  // Populate command palette when opened
+  useEffect(() => {
+    if (commandPaletteOpen) {
+      loadCommandPaletteItems()
+    }
+  }, [commandPaletteOpen, loadCommandPaletteItems])
+
+  // Global keyboard shortcuts
+  useKeyboardShortcuts([
+    { key: 'k', metaKey: true, action: () => commandPaletteOpen ? closeCommandPalette() : openCommandPalette() },
+    { key: 'b', metaKey: true, action: () => setSidebarCollapsed((c) => !c) },
+    { key: 'n', metaKey: true, action: () => { if (selectedKb) api.createSession(selectedKb.id).then(handleNewSession).catch((e) => toast(e.message, 'error')) } },
+    { key: 'Escape', action: () => closeCommandPalette() },
+  ], !!token)
 
   const flushStreamingContent = useCallback((sessionId: number) => {
     const entry = streamingAccumRef.current.get(sessionId)
@@ -48,7 +149,9 @@ export default function App() {
     flushTimerRef.current.set(sessionId, tid)
   }, [flushStreamingContent])
 
-  if (!token) return <ToastProvider><AuthPage /></ToastProvider>
+  if (!token) {
+    return <AuthPage />
+  }
 
   const handleSelectKb = (kb: KnowledgeBase) => {
     setSelectedKb(kb)
@@ -63,7 +166,6 @@ export default function App() {
         stopRefs.current.delete(prev.id)
         setStreamingSessions((s) => { const n = new Set(s); n.delete(prev.id); return n })
       }
-      // Clean up any pending flush for the previous session
       const tid = flushTimerRef.current.get(prev.id)
       if (tid) { clearTimeout(tid); flushTimerRef.current.delete(prev.id) }
       streamingAccumRef.current.delete(prev.id)
@@ -71,7 +173,10 @@ export default function App() {
     setSelectedSession(session)
   }
 
-  const handleNewSession = (session: Session) => setSelectedSession(session)
+  const handleNewSession = (session: Session) => {
+    setSelectedSession(session)
+    toast(`已创建会话「${session.title}」`, 'success')
+  }
 
   const handleSessionRenamed = (session: Session) => {
     if (selectedSession?.id === session.id) {
@@ -109,6 +214,7 @@ export default function App() {
           role: m.role as 'user' | 'assistant',
           content: m.content,
           sources: m.sources || [],
+          created_at: m.created_at,
         })))
         return next
       })
@@ -149,7 +255,6 @@ export default function App() {
         scheduleFlush(sess.id)
       },
       (dbMsgId) => {
-        // Flush any remaining accumulated content before marking done
         flushStreamingContent(sess.id)
         streamingAccumRef.current.delete(sess.id)
         const tid = flushTimerRef.current.get(sess.id)
@@ -180,7 +285,6 @@ export default function App() {
     const sess = selectedSession
     if (!sess || streamingSessions.has(sess.id)) return
 
-    // Truncate from target message
     setMessagesBySession((prev) => {
       const next = new Map(prev)
       const list = next.get(sess.id) ?? []
@@ -252,7 +356,6 @@ export default function App() {
     stopRefs.current.get(sess.id)?.()
     stopRefs.current.delete(sess.id)
     setStreamingSessions((s) => { const n = new Set(s); n.delete(sess.id); return n })
-    // Flush any pending accumulated content before marking all streaming messages done
     flushStreamingContent(sess.id)
     streamingAccumRef.current.delete(sess.id)
     const tid = flushTimerRef.current.get(sess.id)
@@ -268,29 +371,42 @@ export default function App() {
   const isStreaming = selectedSession ? streamingSessions.has(selectedSession.id) : false
 
   return (
-    <ToastProvider>
-      <div className="h-screen flex overflow-hidden" style={{ background: 'var(--bg-base)' }}>
-        <Sidebar
-          selectedKb={selectedKb}
-          selectedSession={selectedSession}
-          onSelectKb={handleSelectKb}
-          onSelectSession={handleSelectSession}
-          onNewSession={handleNewSession}
-          onSessionRenamed={handleSessionRenamed}
-          onKbDeleted={handleKbDeleted}
+    <div className="h-screen flex overflow-hidden" style={{ background: 'var(--bg-base)' }}>
+      <Sidebar
+        selectedKb={selectedKb}
+        selectedSession={selectedSession}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
+        onSelectKb={handleSelectKb}
+        onSelectSession={handleSelectSession}
+        onNewSession={handleNewSession}
+        onSessionRenamed={handleSessionRenamed}
+        onKbDeleted={handleKbDeleted}
+      />
+      <main className="flex-1 flex overflow-hidden">
+        <ChatArea
+          kb={selectedKb}
+          session={selectedSession}
+          messages={currentMessages}
+          isStreaming={isStreaming}
+          onSend={handleSend}
+          onStop={handleStop}
+          onRetrace={handleRetrace}
         />
-        <main className="flex-1 flex overflow-hidden">
-          <ChatArea
-            kb={selectedKb}
-            session={selectedSession}
-            messages={currentMessages}
-            isStreaming={isStreaming}
-            onSend={handleSend}
-            onStop={handleStop}
-            onRetrace={handleRetrace}
-          />
-        </main>
-      </div>
+      </main>
+      <CommandPalette
+        open={commandPaletteOpen}
+        onClose={closeCommandPalette}
+        items={commandPaletteItems}
+      />
+    </div>
+  )
+}
+
+export default function App() {
+  return (
+    <ToastProvider>
+      <AppInner />
     </ToastProvider>
   )
 }

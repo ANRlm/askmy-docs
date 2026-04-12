@@ -11,6 +11,8 @@ import DocumentModal from '../kb/DocumentModal'
 interface Props {
   selectedKb: KnowledgeBase | null
   selectedSession: Session | null
+  collapsed: boolean
+  onToggleCollapse: () => void
   onSelectKb: (kb: KnowledgeBase) => void
   onSelectSession: (session: Session) => void
   onNewSession: (session: Session) => void
@@ -19,7 +21,7 @@ interface Props {
 }
 
 export default function Sidebar({
-  selectedKb, selectedSession,
+  selectedKb, selectedSession, collapsed, onToggleCollapse,
   onSelectKb, onSelectSession, onNewSession, onSessionRenamed, onKbDeleted,
 }: Props) {
   const { user, logout } = useAuth()
@@ -36,14 +38,23 @@ export default function Sidebar({
   const [renameValue, setRenameValue] = useState('')
   const renameInputRef = useRef<HTMLInputElement>(null)
 
+  const loadSessionsAbortRef = useRef<AbortController | null>(null)
+
   const loadKbs = async () => {
     try { setKbs(await api.listKBs()) } catch {}
   }
 
   const loadSessions = async (kbId: number) => {
+    if (loadSessionsAbortRef.current) {
+      loadSessionsAbortRef.current.abort()
+    }
+    const controller = new AbortController()
+    loadSessionsAbortRef.current = controller
     try {
-      const data = await api.listSessions(kbId)
-      setSessionsByKb((prev) => new Map(prev).set(kbId, data))
+      const data = await api.listSessions(kbId, controller.signal)
+      if (!controller.signal.aborted) {
+        setSessionsByKb((prev) => new Map(prev).set(kbId, data))
+      }
     } catch {}
   }
 
@@ -157,18 +168,21 @@ export default function Sidebar({
       )
     : kbs
 
+  const collapsedWidth = 52
+
   return (
     <>
       <aside
-        className="w-[240px] flex-shrink-0 flex flex-col h-full"
+        className="flex-shrink-0 flex flex-col h-full sidebar-collapse"
         style={{
+          width: collapsed ? collapsedWidth : 240,
           background: 'var(--bg-sidebar)',
           borderRight: '1px solid var(--border)',
         }}
       >
-        {/* Logo */}
+        {/* Logo + collapse toggle */}
         <div
-          className="px-4 py-[14px] flex items-center gap-2.5"
+          className="px-3 py-[14px] flex items-center gap-2"
           style={{ borderBottom: '1px solid var(--border)' }}
         >
           <div
@@ -177,15 +191,26 @@ export default function Sidebar({
           >
             <BookOpen className="w-3.5 h-3.5" style={{ color: 'var(--accent-fg)' }} />
           </div>
-          <span
-            className="font-semibold text-[13.5px] tracking-tight"
-            style={{ color: 'var(--text-primary)' }}
+          {!collapsed && (
+            <span
+              className="font-semibold text-[13.5px] tracking-tight truncate"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              AskMyDocs
+            </span>
+          )}
+          <button
+            onClick={onToggleCollapse}
+            className="ml-auto interactive-icon w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
+            style={{ color: 'var(--text-tertiary)' }}
+            aria-label={collapsed ? '展开侧边栏' : '折叠侧边栏'}
           >
-            AskMyDocs
-          </span>
+            <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-200 ${collapsed ? '' : 'rotate-180'}`} />
+          </button>
         </div>
 
-        {/* Search */}
+        {/* Search — hidden when collapsed */}
+        {!collapsed && (
         <div className="px-3 py-2.5" style={{ borderBottom: '1px solid var(--border)' }}>
           <div
             className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
@@ -204,14 +229,16 @@ export default function Sidebar({
               style={{ color: 'var(--text-primary)' }}
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} style={{ color: 'var(--text-tertiary)' }}>
+              <button onClick={() => setSearchQuery('')} style={{ color: 'var(--text-tertiary)' }} aria-label="清除搜索">
                 <X className="w-3 h-3" />
               </button>
             )}
           </div>
         </div>
+        )}
 
         {/* KB List */}
+        {!collapsed && (
         <div className="flex-1 overflow-y-auto py-1.5">
           {/* Section header */}
           <div className="flex items-center justify-between px-3.5 pb-1.5 pt-1">
@@ -225,7 +252,7 @@ export default function Sidebar({
               onClick={() => setCreating(!creating)}
               className="interactive-icon w-5 h-5 flex items-center justify-center rounded-md"
               style={{ color: 'var(--text-tertiary)' }}
-              title="新建知识库"
+              aria-label="新建知识库"
             >
               <Plus className="w-3.5 h-3.5" />
             </button>
@@ -313,7 +340,7 @@ export default function Sidebar({
                     onClick={(e) => { e.stopPropagation(); setDocModalKb(kb) }}
                     className="interactive-icon p-1 rounded-md"
                     style={{ color: 'var(--text-tertiary)' }}
-                    title="管理文档"
+                    aria-label="管理文档"
                   >
                     <Settings className="w-3 h-3" />
                   </button>
@@ -321,7 +348,7 @@ export default function Sidebar({
                     onClick={(e) => handleDeleteKb(e, kb.id)}
                     className="interactive-icon p-1 rounded-md"
                     style={{ color: 'var(--text-tertiary)' }}
-                    title="删除知识库"
+                    aria-label="删除知识库"
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
@@ -386,6 +413,7 @@ export default function Sidebar({
                           onClick={(e) => handleDeleteSession(e, session.id, kb.id)}
                           className="opacity-0 group-hover:opacity-100 p-0.5 rounded transition-opacity interactive-icon"
                           style={{ color: 'var(--text-tertiary)' }}
+                          aria-label="删除会话"
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>
@@ -412,8 +440,10 @@ export default function Sidebar({
             </div>
           )}
         </div>
+        )}
 
         {/* User footer */}
+        {!collapsed && (
         <div className="p-2.5" style={{ borderTop: '1px solid var(--border)' }}>
           <div
             className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer group interactive"
@@ -434,9 +464,11 @@ export default function Sidebar({
             <LogOut
               className="w-3.5 h-3.5"
               style={{ color: 'var(--text-disabled)' }}
+              aria-label="退出登录"
             />
           </div>
         </div>
+        )}
       </aside>
 
       {docModalKb && (

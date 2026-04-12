@@ -1,6 +1,7 @@
 import os
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+import asyncio
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from database import get_db
@@ -10,12 +11,17 @@ from models.document import Document
 from middleware.auth import get_current_user
 from middleware.rate_limit import check_rate_limit
 from config import settings
-from chroma_client import get_collection
+from chroma_client import get_collection, delete_collection
 from loguru import logger
 
 router = APIRouter(tags=["文档管理"])
 
 ALLOWED_EXTENSIONS = {".pdf", ".md", ".txt"}
+
+
+def _write_file(path: str, content: bytes) -> None:
+    with open(path, "wb") as f:
+        f.write(content)
 
 
 def get_rq_queue():
@@ -52,8 +58,7 @@ async def upload_document(
     file_path = os.path.join(settings.file_storage_path, unique_name)
 
     content = await file.read()
-    with open(file_path, "wb") as f:
-        f.write(content)
+    await asyncio.to_thread(_write_file, file_path, content)
 
     # 创建文档记录
     doc = Document(
@@ -93,6 +98,8 @@ async def upload_document(
 async def list_documents(
     kb_id: int,
     request: Request,
+    cursor: int | None = Query(None, description="上次返回的最后一个文档 ID"),
+    limit: int = Query(50, ge=1, le=100, description="每页数量"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -104,9 +111,15 @@ async def list_documents(
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="知识库不存在")
 
-    result = await db.execute(
-        select(Document).where(Document.kb_id == kb_id, Document.user_id == current_user.id)
+    query = select(Document).where(
+        Document.kb_id == kb_id,
+        Document.user_id == current_user.id,
     )
+    if cursor is not None:
+        query = query.where(Document.id < cursor)
+    query = query.order_by(Document.id.desc()).limit(limit)
+
+    result = await db.execute(query)
     docs = result.scalars().all()
     return [
         {
@@ -174,7 +187,7 @@ async def delete_document(
     # 删除 Chroma 中的向量
     try:
         collection = get_collection(kb_id)
-        collection.delete(where={"document_id": str(doc_id)})
+        await asyncio.to_thread(collection.delete, where={"document_id": str(doc_id)})
     except Exception as e:
         logger.warning(f"删除 Chroma 向量失败: {e}")
 

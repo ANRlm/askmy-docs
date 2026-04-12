@@ -1,3 +1,4 @@
+import os
 from loguru import logger
 import sys
 import contextvars
@@ -12,6 +13,9 @@ def set_request_id(rid: str):
 
 def setup_logger():
     logger.remove()
+
+    log_dir = os.environ.get("LOG_DIR", "/var/log/ai_assistant")
+    os.makedirs(log_dir, exist_ok=True)
 
     def format_with_request_id(record):
         rid = _request_id_ctx.get()
@@ -30,7 +34,7 @@ def setup_logger():
         level="INFO",
     )
     logger.add(
-        "/tmp/ai_assistant.log",
+        os.path.join(log_dir, "ai_assistant.log"),
         rotation="50 MB",
         retention="7 days",
         level="DEBUG",

@@ -1,10 +1,13 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func, Text, Float
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func, Text, Float, Index
 from sqlalchemy.dialects.postgresql import JSONB
 from database import Base
 
 
 class Message(Base):
     __tablename__ = "messages"
+    __table_args__ = (
+        Index('ix_messages_session_created', 'session_id', 'created_at'),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(Integer, ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False, index=True)

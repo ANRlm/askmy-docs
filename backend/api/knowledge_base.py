@@ -93,7 +93,7 @@ async def delete_knowledge_base(
         raise HTTPException(status_code=404, detail="知识库不存在")
 
     # 删除 Chroma Collection
-    delete_collection(kb_id)
+    await delete_collection(kb_id)
 
     await db.delete(kb)
     await db.commit()

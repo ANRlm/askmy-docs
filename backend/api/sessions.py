@@ -1,7 +1,7 @@
 import asyncio
 import json
 import time
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
@@ -68,6 +68,8 @@ async def create_session(
 async def list_sessions(
     kb_id: int,
     request: Request,
+    cursor: int | None = Query(None, description="上次返回的最后一个会话 ID"),
+    limit: int = Query(50, ge=1, le=100, description="每页数量"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -78,9 +80,15 @@ async def list_sessions(
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="知识库不存在")
 
-    result = await db.execute(
-        select(Session).where(Session.kb_id == kb_id, Session.user_id == current_user.id)
+    query = select(Session).where(
+        Session.kb_id == kb_id,
+        Session.user_id == current_user.id,
     )
+    if cursor is not None:
+        query = query.where(Session.id < cursor)
+    query = query.order_by(Session.id.desc()).limit(limit)
+
+    result = await db.execute(query)
     sessions = result.scalars().all()
     return [
         {"id": s.id, "title": s.title, "kb_id": s.kb_id, "created_at": s.created_at, "updated_at": s.updated_at}
