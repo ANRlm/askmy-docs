@@ -40,11 +40,13 @@ export function useRecorder(onComplete: OnRecordingComplete) {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     } catch (e: any) {
       if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
-        setError('麦克风权限被拒绝，请在浏览器设置中允许访问麦克风')
-      } else if (e.name === 'NotFoundError') {
-        setError('未检测到麦克风设备')
+        setError('麦克风权限被拒绝：请点击地址栏左侧的锁图标 → 麦克风 → 允许，然后刷新页面')
+      } else if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
+        setError('未检测到麦克风设备，请检查系统音频输入设置')
+      } else if (e.name === 'NotReadableError' || e.name === 'TrackStartError') {
+        setError('麦克风被其他应用占用，请关闭其他使用麦克风的程序后重试')
       } else {
-        setError(`无法启动录音: ${e.message}`)
+        setError(`无法启动录音 (${e.name}): ${e.message}`)
       }
       return
     }
