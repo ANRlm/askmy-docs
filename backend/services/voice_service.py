@@ -1,51 +1,69 @@
 import os
-import io
-import httpx
+import base64
 import dashscope
-from dashscope.audio.asr import Recognition
 from dashscope.audio.tts_v2 import SpeechSynthesizer
+from openai import OpenAI
 from config import settings
 from loguru import logger
-from typing import AsyncGenerator
-
 
 dashscope.api_key = settings.dashscope_api_key
 
+# Qwen3-ASR-Flash 通过 OpenAI 兼容接口调用
+_stt_client = None
+
+
+def _get_stt_client() -> OpenAI:
+    global _stt_client
+    if _stt_client is None:
+        _stt_client = OpenAI(
+            api_key=settings.dashscope_api_key,
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        )
+    return _stt_client
+
 
 async def speech_to_text(audio_bytes: bytes, audio_format: str = "wav") -> str:
-    """调用阿里百炼语音识别 API"""
-    # 将音频保存到临时文件
-    import tempfile
-    with tempfile.NamedTemporaryFile(suffix=f".{audio_format}", delete=False) as tmp:
-        tmp.write(audio_bytes)
-        tmp_path = tmp.name
+    """
+    调用 Qwen3-ASR-Flash 语音识别。
+    使用 OpenAI 兼容接口，将音频以 Base64 编码后传入 input_audio 字段。
+    支持格式：wav / mp3 / m4a
+    """
+    client = _get_stt_client()
+    audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
 
     try:
-        recognition = Recognition(
+        response = client.chat.completions.create(
             model=settings.stt_model,
-            format=audio_format,
-            sample_rate=16000,
-            callback=None,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "input_audio",
+                            "input_audio": {
+                                "data": f"data:audio/{audio_format};base64,{audio_b64}",
+                                "format": audio_format,
+                            },
+                        }
+                    ],
+                }
+            ],
         )
-        result = recognition.call(tmp_path)
-        if result.status_code == 200:
-            sentences = result.get_sentence()
-            if sentences:
-                text = " ".join(s["text"] for s in sentences if s.get("text"))
-                return text
-            return ""
-        else:
-            logger.error(f"STT 失败: {result.message}")
-            raise Exception(f"语音识别失败: {result.message}")
-    finally:
-        os.unlink(tmp_path)
+        text = response.choices[0].message.content or ""
+        return text.strip()
+    except Exception as e:
+        logger.error(f"STT 调用失败: {e}")
+        raise Exception(f"语音识别失败: {e}")
 
 
 def text_to_speech_stream(text: str) -> bytes:
-    """调用阿里百炼 TTS API，返回音频字节"""
+    """
+    调用 cosyvoice-v3-flash TTS API，返回 MP3 音频字节。
+    使用 dashscope.audio.tts_v2.SpeechSynthesizer。
+    """
     synthesizer = SpeechSynthesizer(
         model=settings.tts_model,
-        voice="longxiaochun",  # 默认音色
+        voice=settings.tts_voice,
     )
     audio = synthesizer.call(text)
     if audio:
