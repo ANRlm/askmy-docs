@@ -21,6 +21,9 @@ from loguru import logger
 
 router = APIRouter(tags=["对话与问答"])
 
+# Track active compression tasks per session so they can be cancelled on session deletion
+_active_compression_tasks: dict[int, asyncio.Task] = {}
+
 
 class CreateSessionRequest(BaseModel):
     title: str = "新会话"
@@ -153,18 +156,31 @@ async def chat(
         logger.info(f"会话 {session_id} 触发记忆压缩（后台异步执行）")
 
         async def compress_and_save():
+            from database import AsyncSessionLocal
+            from sqlalchemy import update
+            from models.session import Session as SessionModel
+            # Cancel any prior compression task for this session
+            if session_id in _active_compression_tasks:
+                _active_compression_tasks[session_id].cancel()
+            task = asyncio.current_task()
+            _active_compression_tasks[session_id] = task
             try:
-                new_summary = await get_new_summary(session.summary, history)
-                from sqlalchemy import update
-                from models.session import Session as SessionModel
-                await db.execute(
-                    update(SessionModel)
-                    .where(SessionModel.id == session_id)
-                    .values(summary=new_summary)
-                )
-                await db.commit()
+                # Use a fresh DB session to avoid relying on the request-scoped one
+                async with AsyncSessionLocal() as db_compress:
+                    new_summary = await get_new_summary(session.summary, history)
+                    await db_compress.execute(
+                        update(SessionModel)
+                        .where(SessionModel.id == session_id)
+                        .values(summary=new_summary)
+                    )
+                    await db_compress.commit()
+                logger.info(f"会话 {session_id} 记忆压缩完成")
+            except asyncio.CancelledError:
+                logger.info(f"会话 {session_id} 记忆压缩被取消")
             except Exception as e:
                 logger.error(f"后台记忆压缩失败: {e}")
+            finally:
+                _active_compression_tasks.pop(session_id, None)
 
         asyncio.create_task(compress_and_save())
 
@@ -254,6 +270,11 @@ async def delete_session(
     session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="会话不存在")
+
+    # Cancel any in-flight compression task before deleting the session
+    if session_id in _active_compression_tasks:
+        _active_compression_tasks[session_id].cancel()
+        del _active_compression_tasks[session_id]
 
     await db.delete(session)
     await db.commit()

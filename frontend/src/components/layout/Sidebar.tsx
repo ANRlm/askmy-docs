@@ -15,11 +15,12 @@ interface Props {
   onSelectSession: (session: Session) => void
   onNewSession: (session: Session) => void
   onSessionRenamed?: (session: Session) => void
+  onKbDeleted?: (kbId: number) => void
 }
 
 export default function Sidebar({
   selectedKb, selectedSession,
-  onSelectKb, onSelectSession, onNewSession, onSessionRenamed,
+  onSelectKb, onSelectSession, onNewSession, onSessionRenamed, onKbDeleted,
 }: Props) {
   const { user, logout } = useAuth()
   const [kbs, setKbs] = useState<KnowledgeBase[]>([])
@@ -142,6 +143,8 @@ export default function Sidebar({
     try {
       await api.deleteKB(kbId)
       setKbs((prev) => prev.filter((k) => k.id !== kbId))
+      setSessionsByKb((prev) => { const n = new Map(prev); n.delete(kbId); return n })
+      onKbDeleted?.(kbId)
     } catch {}
   }
 

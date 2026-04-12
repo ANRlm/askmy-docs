@@ -15,21 +15,23 @@ const statusLabel: Record<Document['status'], string> = {
   failed: '失败',
 }
 
-function StatusBadge({ status }: { status: Document['status'] }) {
-  const config = {
-    done:       { color: 'var(--success)', bg: 'var(--success-bg)', icon: <CheckCircle className="w-3 h-3" /> },
-    failed:     { color: 'var(--error)',   bg: 'var(--error-bg)',   icon: <AlertCircle className="w-3 h-3" /> },
-    processing: { color: 'var(--info)',    bg: 'var(--info-bg)',    icon: <RefreshCw className="w-3 h-3 animate-spin" /> },
-    pending:    { color: 'var(--warning)', bg: 'var(--warning-bg)', icon: <Clock className="w-3 h-3" /> },
-  }[status]
+const BADGE_CONFIG: Record<string, { color: string; bg: string; icon: React.ReactNode }> = {
+  done:       { color: 'var(--success)',  bg: 'var(--success-bg)',  icon: <CheckCircle  className="w-3 h-3" /> },
+  failed:     { color: 'var(--error)',    bg: 'var(--error-bg)',    icon: <AlertCircle  className="w-3 h-3" /> },
+  processing: { color: 'var(--info)',     bg: 'var(--info-bg)',      icon: <RefreshCw    className="w-3 h-3 animate-spin" /> },
+  pending:    { color: 'var(--warning)',  bg: 'var(--warning-bg)',  icon: <Clock        className="w-3 h-3" /> },
+}
+const BADGE_FALLBACK = { color: 'var(--text-disabled)', bg: 'var(--bg-hover)', icon: <Clock className="w-3 h-3" /> }
 
+function StatusBadge({ status }: { status: string | undefined | null }) {
+  const c = BADGE_CONFIG[status ?? ''] ?? BADGE_FALLBACK
   return (
     <span
       className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10.5px] font-medium"
-      style={{ color: config.color, background: config.bg }}
+      style={{ color: c.color, background: c.bg }}
     >
-      {config.icon}
-      {statusLabel[status]}
+      {c.icon}
+      {status ? (statusLabel[status as keyof typeof statusLabel] ?? '未知') : '未知'}
     </span>
   )
 }

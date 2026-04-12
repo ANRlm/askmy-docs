@@ -7,12 +7,14 @@ from loguru import logger
 from utils.logger import setup_logger
 from database import init_db
 from config import settings
+from clients import init_clients, close_clients
 from api.auth import router as auth_router
 from api.knowledge_base import router as kb_router
 from api.documents import router as doc_router
 from api.sessions import router as session_router
 from api.voice import router as voice_router
 from api.stats import router as stats_router
+from middleware.request_id import RequestIDMiddleware
 
 setup_logger()
 
@@ -30,9 +32,13 @@ async def lifespan(app: FastAPI):
             " 请在 .env 中设置随机密钥：openssl rand -hex 32"
         )
 
+    init_clients()
+    logger.info("外部服务客户端初始化完成")
+
     await init_db()
     logger.info("数据库初始化完成")
     yield
+    close_clients()
     logger.info("服务关闭")
 
 
@@ -50,6 +56,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RequestIDMiddleware)
 
 
 @app.exception_handler(Exception)

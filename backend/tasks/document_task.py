@@ -2,8 +2,28 @@
 文档异步处理任务（RQ Worker 执行）
 """
 import asyncio
-import os
+from weakref import WeakValueDictionary
 from loguru import logger
+
+# Process-level engine cache (keyed by DATABASE_URL to handle env changes)
+_engines: WeakValueDictionary[str, object] = WeakValueDictionary()
+
+
+def _get_engine():
+    """Get or create a process-level async engine for the current DATABASE_URL."""
+    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+    from config import settings
+    DATABASE_URL = settings.database_url.replace("postgresql://", "postgresql+asyncpg://")
+    engine = _engines.get(DATABASE_URL)
+    if engine is None:
+        engine = create_async_engine(DATABASE_URL, pool_size=10, max_overflow=20)
+        _engines[DATABASE_URL] = engine
+    return engine
+
+
+def _get_session_maker(engine):
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+    return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
 def process_document(document_id: int):
@@ -12,19 +32,17 @@ def process_document(document_id: int):
 
 
 async def _process_document_async(document_id: int):
-    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
     from sqlalchemy import select
     from config import settings
     from models.document import Document
-    from models.knowledge_base import KnowledgeBase  # noqa: F401 — 必须导入以注册外键关联
+    from models.knowledge_base import KnowledgeBase  # noqa: F401
     from models.user import User  # noqa: F401
     from services.document_service import extract_text_from_file, split_into_chunks
     from services.embedding_service import get_embeddings
     from chroma_client import get_collection
 
-    DATABASE_URL = settings.database_url.replace("postgresql://", "postgresql+asyncpg://")
-    engine = create_async_engine(DATABASE_URL)
-    SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    engine = _get_engine()
+    SessionLocal = _get_session_maker(engine)
 
     async with SessionLocal() as db:
         try:
@@ -102,5 +120,3 @@ async def _process_document_async(document_id: int):
                     await db.commit()
             except Exception:
                 pass
-        finally:
-            await engine.dispose()

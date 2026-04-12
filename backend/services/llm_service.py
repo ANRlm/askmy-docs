@@ -2,20 +2,7 @@ from openai import AsyncOpenAI
 from config import settings
 from loguru import logger
 from typing import AsyncGenerator
-
-
-_client = None
-
-
-def get_llm_client() -> AsyncOpenAI:
-    global _client
-    if _client is None:
-        _client = AsyncOpenAI(
-            api_key=settings.llm_api_key,
-            base_url=settings.llm_base_url,
-            timeout=120.0,
-        )
-    return _client
+from clients import get_llm_client
 
 
 async def chat_completion(messages: list[dict], stream: bool = False):

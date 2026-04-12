@@ -1,17 +1,4 @@
-import chromadb
-from config import settings
-
-_client = None
-
-
-def get_chroma_client() -> chromadb.HttpClient:
-    global _client
-    if _client is None:
-        _client = chromadb.HttpClient(
-            host=settings.chroma_host,
-            port=settings.chroma_port,
-        )
-    return _client
+from clients import get_chroma_client
 
 
 def get_collection(kb_id: int):
