@@ -185,8 +185,6 @@ export default function ChatArea({ kb, session }: Props) {
   }, [])
 
   // 语音识别完成回调：识别结果直接发送
-  const [sttError, setSttError] = useState<string | null>(null)
-
   const { recording, error: micError, startRecording, stopRecording } = useRecorder(async (blob, ext) => {
     setSttLoading(true)
     setSttError(null)
