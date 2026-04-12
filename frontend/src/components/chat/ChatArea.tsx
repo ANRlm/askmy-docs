@@ -139,6 +139,7 @@ export default function ChatArea({ kb, session }: Props) {
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
   const [sttLoading, setSttLoading] = useState(false)
+  const [sttError, setSttError] = useState<string | null>(null)
   const stopRef = useRef<(() => void) | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -184,14 +185,18 @@ export default function ChatArea({ kb, session }: Props) {
   }, [])
 
   // 语音识别完成回调：识别结果直接发送
-  const { recording, startRecording, stopRecording } = useRecorder(async (blob, ext) => {
+  const [sttError, setSttError] = useState<string | null>(null)
+
+  const { recording, error: micError, startRecording, stopRecording } = useRecorder(async (blob, ext) => {
     setSttLoading(true)
+    setSttError(null)
     try {
       const result = await api.stt(blob, ext)
       const text = result.text.trim()
       if (text) doSend(text)
-    } catch (e) {
-      console.error('STT 失败:', e)
+      else setSttError('未识别到语音内容，请重试')
+    } catch (e: any) {
+      setSttError(`识别失败: ${e.message}`)
     } finally {
       setSttLoading(false)
     }
@@ -347,7 +352,10 @@ export default function ChatArea({ kb, session }: Props) {
           </div>
         </div>
         <p className="text-center text-[11px] text-white/15 mt-2">
-          AI 回答基于知识库内容，仅供参考
+          {(micError || sttError)
+            ? <span className="text-red-400/80">{micError || sttError}</span>
+            : 'AI 回答基于知识库内容，仅供参考'
+          }
         </p>
       </div>
     </div>
