@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     # LLM
     llm_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     llm_api_key: str = ""
-    llm_model: str = "qwen3-6b-plus-2026-04-02"
+    llm_model: str = "qwen3.6-plus-2026-04-02"
 
     # Embedding
     embedding_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 
     # 语音
     dashscope_api_key: str = ""
-    stt_model: str = "qwen3-asr-flash"
+    stt_model: str = "qwen3-asr-flash-2026-02-10"
     tts_model: str = "cosyvoice-v3-flash"
     tts_voice: str = "longanyang"
 
