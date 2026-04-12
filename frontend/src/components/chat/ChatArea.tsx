@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
@@ -6,13 +6,18 @@ import {
   FileText, Square, ArrowUp, Loader2, ThumbsUp, ThumbsDown,
   Pencil, X, RotateCcw,
 } from 'lucide-react'
-import * as api from '../../api'
 import type { Message, Session, KnowledgeBase, Source } from '../../types'
+import * as api from '../../api'
 import { useRecorder } from '../../hooks/useRecorder'
 
 interface Props {
   kb: KnowledgeBase | null
   session: Session | null
+  messages: Message[]
+  isStreaming: boolean
+  onSend: (text: string) => void
+  onStop: () => void
+  onRetrace: (targetDbId: number, newContent: string) => void
 }
 
 /* ── Source citations ── */
@@ -103,7 +108,10 @@ function FeedbackButtons({ dbId }: { dbId: number }) {
 
   const handleVote = async (rating: 1 | -1) => {
     if (voted !== null) return
-    try { await api.submitFeedback(dbId, rating); setVoted(rating) } catch {}
+    try {
+      await api.submitFeedback(dbId, rating)
+      setVoted(rating)
+    } catch {}
   }
 
   return (
@@ -153,16 +161,9 @@ function UserBubble({ msg, isStreaming, onRetrace }: UserBubbleProps) {
     }
   }, [editing])
 
-  const handleEdit = () => {
-    if (isStreaming) return
-    setDraft(msg.content)
-    setEditing(true)
-  }
-
-  const handleCancel = () => {
-    setEditing(false)
-    setDraft(msg.content)
-  }
+  useEffect(() => {
+    if (!editing) setDraft(msg.content)
+  }, [msg.content, editing])
 
   const handleSubmit = () => {
     const trimmed = draft.trim()
@@ -171,8 +172,12 @@ function UserBubble({ msg, isStreaming, onRetrace }: UserBubbleProps) {
     onRetrace(msg.db_id, trimmed)
   }
 
+  const handleCancel = () => {
+    setEditing(false)
+    setDraft(msg.content)
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // IME composition check: suppress Enter during composition
     if (e.key === 'Enter' && !e.shiftKey && !isComposingRef.current) {
       e.preventDefault()
       handleSubmit()
@@ -200,12 +205,7 @@ function UserBubble({ msg, isStreaming, onRetrace }: UserBubbleProps) {
             onCompositionEnd={() => { isComposingRef.current = false }}
             rows={1}
             className="w-full resize-none rounded-2xl rounded-tr-md px-4 py-3 text-sm leading-relaxed focus:outline-none"
-            style={{
-              background: 'var(--bg-elevated)',
-              border: '2px solid var(--border-strong)',
-              color: 'var(--text-primary)',
-              maxHeight: '200px',
-            }}
+            style={{ background: 'var(--bg-elevated)', border: '2px solid var(--border-strong)', color: 'var(--text-primary)', maxHeight: '200px' }}
           />
           <div className="flex items-center justify-end gap-1.5 mt-1.5">
             <button
@@ -213,8 +213,7 @@ function UserBubble({ msg, isStreaming, onRetrace }: UserBubbleProps) {
               className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] transition-colors"
               style={{ color: 'var(--text-tertiary)', background: 'var(--bg-hover)' }}
             >
-              <X className="w-3 h-3" />
-              取消
+              <X className="w-3 h-3" />取消
             </button>
             <button
               onClick={handleSubmit}
@@ -222,8 +221,7 @@ function UserBubble({ msg, isStreaming, onRetrace }: UserBubbleProps) {
               className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-medium transition-colors disabled:opacity-40"
               style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
             >
-              <RotateCcw className="w-3 h-3" />
-              重新生成
+              <RotateCcw className="w-3 h-3" />重新生成
             </button>
           </div>
         </div>
@@ -244,22 +242,16 @@ function UserBubble({ msg, isStreaming, onRetrace }: UserBubbleProps) {
         >
           <p className="whitespace-pre-wrap">{msg.content}</p>
         </div>
-        {/* Edit button — shown on hover, hidden during streaming */}
         {!isStreaming && msg.db_id && (
           <button
-            onClick={handleEdit}
+            onClick={() => { setDraft(msg.content); setEditing(true) }}
             className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] transition-all"
-            style={{
-              color: 'var(--text-disabled)',
-              opacity: hovered ? 1 : 0,
-              pointerEvents: hovered ? 'auto' : 'none',
-            }}
+            style={{ color: 'var(--text-disabled)', opacity: hovered ? 1 : 0, pointerEvents: hovered ? 'auto' : 'none' }}
             onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-tertiary)' }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-disabled)' }}
             title="编辑并重新生成"
           >
-            <Pencil className="w-3 h-3" />
-            编辑
+            <Pencil className="w-3 h-3" />编辑
           </button>
         )}
       </div>
@@ -330,111 +322,24 @@ function EmptyState({ kb }: { kb: KnowledgeBase | null }) {
 
 /* ─────────────────────────────────────────────── */
 
-let msgId = 0
-const nextId = () => String(++msgId)
-
-export default function ChatArea({ kb, session }: Props) {
-  const [messages, setMessages] = useState<Message[]>([])
+export default function ChatArea({ kb, session, messages, isStreaming, onSend, onStop, onRetrace }: Props) {
   const [input, setInput] = useState('')
-  const [streaming, setStreaming] = useState(false)
   const [sttLoading, setSttLoading] = useState(false)
   const [sttError, setSttError] = useState<string | null>(null)
-  const stopRef = useRef<(() => void) | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const sessionRef = useRef(session)
-  const streamingRef = useRef(streaming)
-  // IME composition tracking for the main input
   const isComposingRef = useRef(false)
 
-  useEffect(() => { sessionRef.current = session }, [session])
-  useEffect(() => { streamingRef.current = streaming }, [streaming])
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
-  /* ── Core send logic ── */
-  const doSend = useCallback((text: string) => {
-    const sess = sessionRef.current
-    if (!text.trim() || !sess || streamingRef.current) return
-
-    setInput('')
-    if (textareaRef.current) textareaRef.current.style.height = 'auto'
-
-    const userMsgLocalId = nextId()
-    const assistantId = nextId()
-
-    setMessages((prev) => [
-      ...prev,
-      { id: userMsgLocalId, role: 'user', content: text },
-      { id: assistantId, role: 'assistant', content: '', streaming: true },
-    ])
-    setStreaming(true)
-    streamingRef.current = true
-
-    const stop = api.chatStream(
-      sess.id, text,
-      (chunk) => setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: m.content + chunk } : m)),
-      (sources) => setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, sources } : m)),
-      (dbMsgId) => {
-        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, streaming: false, db_id: dbMsgId } : m))
-        setStreaming(false); streamingRef.current = false
-      },
-      (err) => {
-        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: `错误: ${err}`, streaming: false } : m))
-        setStreaming(false); streamingRef.current = false
-      },
-    )
-    stopRef.current = stop
-  }, [])
-
-  /* ── Retrace (edit + regenerate) ── */
-  const doRetrace = useCallback((targetDbId: number, newContent: string) => {
-    const sess = sessionRef.current
-    if (!sess || streamingRef.current) return
-
-    // Find the index of the target message and truncate everything from that point
-    setMessages((prev) => {
-      const idx = prev.findIndex((m) => m.db_id === targetDbId)
-      if (idx === -1) return prev
-      return prev.slice(0, idx)
-    })
-
-    // Optimistically add the new user message + placeholder assistant message
-    const userLocalId = nextId()
-    const assistantId = nextId()
-    setMessages((prev) => [
-      ...prev,
-      { id: userLocalId, role: 'user', content: newContent },
-      { id: assistantId, role: 'assistant', content: '', streaming: true },
-    ])
-    setStreaming(true)
-    streamingRef.current = true
-
-    const stop = api.retraceChat(
-      sess.id, targetDbId, newContent,
-      (chunk) => setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: m.content + chunk } : m)),
-      (sources) => setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, sources } : m)),
-      (assistantDbId) => {
-        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, streaming: false, db_id: assistantDbId } : m))
-        setStreaming(false); streamingRef.current = false
-      },
-      (err) => {
-        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: `错误: ${err}`, streaming: false } : m))
-        setStreaming(false); streamingRef.current = false
-      },
-      // Patch the user message with the real db_id returned from backend
-      (userDbId) => {
-        setMessages((prev) => prev.map((m) => m.id === userLocalId ? { ...m, db_id: userDbId } : m))
-      },
-    )
-    stopRef.current = stop
-  }, [])
-
-  /* ── Voice recorder ── */
   const { recording, error: micError, startRecording, stopRecording } = useRecorder(async (blob, ext) => {
     setSttLoading(true); setSttError(null)
     try {
       const result = await api.stt(blob, ext)
       const text = result.text.trim()
-      if (text) doSend(text)
+      if (text) { onSend(text) }
       else setSttError('未识别到语音内容，请重试')
     } catch (e: any) {
       setSttError(`识别失败: ${e.message}`)
@@ -443,38 +348,23 @@ export default function ChatArea({ kb, session }: Props) {
     }
   })
 
-  /* ── Load history ── */
-  useEffect(() => {
-    if (!session) { setMessages([]); return }
-    api.getMessages(session.id).then((msgs) => {
-      setMessages(msgs.map((m) => ({
-        id: nextId(),
-        db_id: m.id,
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-        sources: m.sources || [],
-      })))
-    }).catch(() => {})
-  }, [session?.id])
+  const handleSend = () => {
+    const text = input.trim()
+    if (!text || isStreaming) return
+    setInput('')
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
+    onSend(text)
+  }
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  const handleStop = () => {
+    onStop()
+  }
 
-  const handleSend = () => doSend(input)
-
-  /* ── IME-safe Enter handler ── */
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !isComposingRef.current) {
       e.preventDefault()
       handleSend()
     }
-  }
-
-  const handleStop = () => {
-    stopRef.current?.()
-    setStreaming(false); streamingRef.current = false
-    setMessages((prev) => prev.map((m) => m.streaming ? { ...m, streaming: false } : m))
   }
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -522,8 +412,8 @@ export default function ChatArea({ kb, session }: Props) {
             <UserBubble
               key={msg.id}
               msg={msg}
-              isStreaming={streaming}
-              onRetrace={doRetrace}
+              isStreaming={isStreaming}
+              onRetrace={onRetrace}
             />
           ) : (
             <AssistantBubble key={msg.id} msg={msg} />
@@ -573,7 +463,7 @@ export default function ChatArea({ kb, session }: Props) {
           <div className="flex items-center justify-between px-3 pb-3">
             <button
               onClick={recording ? stopRecording : startRecording}
-              disabled={sttLoading || streaming}
+              disabled={sttLoading || isStreaming}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
                 background: recording ? 'var(--error-bg)' : 'transparent',
@@ -589,7 +479,7 @@ export default function ChatArea({ kb, session }: Props) {
               <span>{sttLoading ? '识别中...' : recording ? '点击结束' : '语音'}</span>
             </button>
 
-            {streaming ? (
+            {isStreaming ? (
               <button
                 onClick={handleStop}
                 className="w-8 h-8 flex items-center justify-center rounded-xl transition-colors"

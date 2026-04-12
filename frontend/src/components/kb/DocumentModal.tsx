@@ -16,13 +16,12 @@ const statusLabel: Record<Document['status'], string> = {
 }
 
 function StatusBadge({ status }: { status: Document['status'] }) {
-  const configs: Record<string, { color: string; bg: string; icon: React.ReactNode }> = {
+  const config = {
     done:       { color: 'var(--success)', bg: 'var(--success-bg)', icon: <CheckCircle className="w-3 h-3" /> },
     failed:     { color: 'var(--error)',   bg: 'var(--error-bg)',   icon: <AlertCircle className="w-3 h-3" /> },
     processing: { color: 'var(--info)',    bg: 'var(--info-bg)',    icon: <RefreshCw className="w-3 h-3 animate-spin" /> },
     pending:    { color: 'var(--warning)', bg: 'var(--warning-bg)', icon: <Clock className="w-3 h-3" /> },
-  }
-  const config = configs[status] ?? configs.pending
+  }[status]
 
   return (
     <span
@@ -30,7 +29,7 @@ function StatusBadge({ status }: { status: Document['status'] }) {
       style={{ color: config.color, background: config.bg }}
     >
       {config.icon}
-      {statusLabel[status] ?? status}
+      {statusLabel[status]}
     </span>
   )
 }
@@ -41,7 +40,7 @@ export default function DocumentModal({ kb, onClose }: Props) {
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  // Track whether the component is still mounted to prevent setState after unmount
+  // Prevent setState after unmount
   const mountedRef = useRef(true)
 
   useEffect(() => {
@@ -72,8 +71,7 @@ export default function DocumentModal({ kb, onClose }: Props) {
   }
 
   const startPolling = () => {
-    // Always clear any existing interval before starting a new one
-    stopPolling()
+    if (pollingRef.current) return
     pollingRef.current = setInterval(async () => {
       if (!mountedRef.current) { stopPolling(); return }
       const data = await api.listDocuments(kb.id).catch(() => null)
@@ -89,14 +87,12 @@ export default function DocumentModal({ kb, onClose }: Props) {
   useEffect(() => {
     load()
     startPolling()
-    // Cleanup is handled by the mountedRef effect above
   }, [kb.id])
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     if (!files.length) return
-    setUploading(true)
-    setError('')
+    if (mountedRef.current) { setUploading(true); setError('') }
     try {
       for (const file of files) await api.uploadDocument(kb.id, file)
       await load()
