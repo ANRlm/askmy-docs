@@ -3,12 +3,12 @@ from sqlalchemy.orm import DeclarativeBase
 from config import settings
 
 # 将 postgresql:// 替换为 postgresql+asyncpg://
-DATABASE_URL = settings.database_url.replace(
-    "postgresql://", "postgresql+asyncpg://"
-)
+DATABASE_URL = settings.database_url.replace("postgresql://", "postgresql+asyncpg://")
 
 engine = create_async_engine(DATABASE_URL, echo=False)
-AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+AsyncSessionLocal = async_sessionmaker(
+    engine, class_=AsyncSession, expire_on_commit=False
+)
 
 
 class Base(DeclarativeBase):
@@ -25,5 +25,14 @@ async def get_db():
 
 async def init_db():
     async with engine.begin() as conn:
-        from models import user, knowledge_base, document, session, message, feedback  # noqa
+        from models import (
+            user,
+            knowledge_base,
+            document,
+            session,
+            message,
+            feedback,
+            password_reset,
+        )  # noqa
+
         await conn.run_sync(Base.metadata.create_all)

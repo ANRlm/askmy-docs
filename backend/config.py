@@ -40,6 +40,14 @@ class Settings(BaseSettings):
     # 文件存储
     file_storage_path: str = "/data/files"
 
+    # Email
+    email_smtp_host: str = ""
+    email_smtp_port: int = 587
+    email_username: str = ""
+    email_password: str = ""
+    email_from_address: str = "noreply@askmydocs.com"
+    email_use_tls: bool = True
+
     # CORS — 多个域名用英文逗号分隔，例如：http://localhost:3000,https://example.com
     cors_origins: str = "http://localhost:3000"
 
@@ -58,4 +66,3 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
-
