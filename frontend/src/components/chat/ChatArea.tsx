@@ -504,7 +504,7 @@ function AssistantBubble({ msg, onRetry }: { msg: Message; onRetry?: (text: stri
                 },
               }}
             >
-              {msg.content}
+              {msg.content || (msg.streaming ? '正在生成...' : '')}
             </ReactMarkdown>
             {msg.streaming && (
               <span className="inline-flex gap-1 ml-1 align-middle">
