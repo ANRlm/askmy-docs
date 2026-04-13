@@ -6,12 +6,13 @@ import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import {
   Mic, MicOff, Volume2, VolumeX, ChevronDown, ChevronRight,
   FileText, Square, ArrowUp, Loader2, ThumbsUp, ThumbsDown,
-  Pencil, X, RotateCcw, Copy, CheckCheck, Clock,
+  Pencil, X, Search, Download, RotateCcw, Copy, CheckCheck, Clock, Menu,
 } from 'lucide-react'
 import type { Message, Session, KnowledgeBase, Source } from '../../types'
 import * as api from '../../api'
 import { useToast } from '../ui/Toast'
 import { useRecorder } from '../../hooks/useRecorder'
+import ConfirmDialog from '../ui/ConfirmDialog'
 
 /* ── Waveform visualizer ── */
 function Waveform({ analyserRef }: { analyserRef: React.RefObject<AnalyserNode | null> }) {
@@ -64,6 +65,8 @@ interface Props {
   onSend: (text: string) => void
   onStop: () => void
   onRetrace: (targetDbId: number, newContent: string) => void
+  isMobile?: boolean
+  onOpenDrawer?: () => void
 }
 
 /* ── Skeleton message row ── */
@@ -311,9 +314,12 @@ interface UserBubbleProps {
   msg: Message
   isStreaming: boolean
   onRetrace: (msgId: number, content: string) => void
+  onRequestCancel?: (draft: string) => void
+  highlightFn?: (text: string, query: string) => React.ReactNode
+  searchQuery?: string
 }
 
-function UserBubble({ msg, isStreaming, onRetrace }: UserBubbleProps) {
+function UserBubble({ msg, isStreaming, onRetrace, onRequestCancel, highlightFn, searchQuery }: UserBubbleProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(msg.content)
   const [hovered, setHovered] = useState(false)
@@ -342,8 +348,13 @@ function UserBubble({ msg, isStreaming, onRetrace }: UserBubbleProps) {
   }
 
   const handleCancel = () => {
-    setEditing(false)
-    setDraft(msg.content)
+    const hasChanges = draft.trim() !== msg.content.trim()
+    if (hasChanges && onRequestCancel) {
+      onRequestCancel(draft)
+    } else {
+      setEditing(false)
+      setDraft(msg.content)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -422,7 +433,9 @@ function UserBubble({ msg, isStreaming, onRetrace }: UserBubbleProps) {
             color: 'var(--text-primary)',
           }}
         >
-          <p className="whitespace-pre-wrap">{msg.content}</p>
+          <p className="whitespace-pre-wrap">
+            {searchQuery && highlightFn ? highlightFn(msg.content, searchQuery) : msg.content}
+          </p>
         </div>
         {/* Meta row: timestamp + actions */}
         <div
@@ -457,7 +470,7 @@ function UserBubble({ msg, isStreaming, onRetrace }: UserBubbleProps) {
 }
 
 /* ── AI message bubble ── */
-function AssistantBubble({ msg, onRetry }: { msg: Message; onRetry?: (text: string) => void }) {
+function AssistantBubble({ msg, onRetry, highlightFn, searchQuery }: { msg: Message; onRetry?: (text: string) => void; highlightFn?: (text: string, query: string) => React.ReactNode; searchQuery?: string }) {
   const [hovered, setHovered] = useState(false)
   const isError = msg.content.startsWith('错误:')
 
@@ -490,7 +503,8 @@ function AssistantBubble({ msg, onRetry }: { msg: Message; onRetry?: (text: stri
                 },
               }}
             >
-              {msg.content || (msg.streaming ? '正在生成...' : '')}
+              {/* @ts-ignore - ReactMarkdown accepts ReactNodes at runtime */}
+              {searchQuery && highlightFn ? (highlightFn(msg.content || '', searchQuery) as React.ReactNode) : (msg.content || (msg.streaming ? '正在生成...' : ''))}
             </ReactMarkdown>
             {msg.streaming && (
               <span className="inline-flex gap-1 ml-1 align-middle">
@@ -589,16 +603,38 @@ function MarkdownPreview({ text }: { text: string }) {
 
 const MAX_CHARS = 2000
 
-export default function ChatArea({ kb, session, messages, isStreaming, isLoadingMessages, onSend, onStop, onRetrace }: Props) {
+export default function ChatArea({ kb, session, messages, isStreaming, isLoadingMessages, onSend, onStop, onRetrace, isMobile, onOpenDrawer }: Props) {
   const [input, setInput] = useState('')
   const [sttLoading, setSttLoading] = useState(false)
   const [sttError, setSttError] = useState<string | null>(null)
   const [showPreview, setShowPreview] = useState(false)
   const [userScrolledAway, setUserScrolledAway] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const { toast } = useToast()
+  const [showSearch, setShowSearch] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [cancelConfirm, setCancelConfirm] = useState<{
+    draft: string
+    msgId: string
+  } | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const isComposingRef = useRef(false)
+
+  // Ctrl+F to focus search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault()
+        setShowSearch(true)
+        setTimeout(() => searchInputRef.current?.focus(), 50)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   // Only auto-scroll if user hasn't scrolled away
   useEffect(() => {
@@ -655,6 +691,37 @@ export default function ChatArea({ kb, session, messages, isStreaming, isLoading
   }
 
   const charCount = input.length
+
+  // Highlight helper: wraps matching substrings with <mark>
+  const highlightText = (text: string, query: string) => {
+    if (!query.trim()) return text
+    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+    const parts = text.split(regex)
+    return parts.map((part, i) =>
+      regex.test(part) ? <mark key={i} style={{ background: 'var(--warning-bg)', color: 'var(--warning)', borderRadius: '2px', padding: '0 1px' }}>{part}</mark> : part
+    )
+  }
+
+  // Export handler
+  const handleExport = async () => {
+    if (!session) return
+    setExporting(true)
+    try {
+      const md = await api.exportSession(session.id)
+      const blob = new Blob([md], { type: 'text/markdown' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${session.title || '会话'}_${new Date().toISOString().slice(0, 10)}.md`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast('会话已导出', 'success')
+    } catch {
+      toast('导出失败', 'error')
+    } finally {
+      setExporting(false)
+    }
+  }
   const isNearLimit = charCount > MAX_CHARS * 0.85
   const isOverLimit = charCount > MAX_CHARS
 
@@ -675,6 +742,19 @@ export default function ChatArea({ kb, session, messages, isStreaming, isLoading
       >
         {/* Status indicator */}
         <div className="relative flex-shrink-0">
+          {isMobile && (
+            <button
+              onClick={onOpenDrawer}
+              className="interactive-icon w-7 h-7 flex items-center justify-center rounded-lg"
+              style={{ color: 'var(--text-tertiary)' }}
+              aria-label="打开侧边栏"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+        <div className="relative flex-shrink-0 flex items-center gap-2">
+          {/* Status indicator */}
           <div
             className="w-2 h-2 rounded-full"
             style={{ background: 'var(--success)' }}
@@ -688,7 +768,7 @@ export default function ChatArea({ kb, session, messages, isStreaming, isLoading
             />
           )}
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
             {session.title}
           </h2>
@@ -697,7 +777,74 @@ export default function ChatArea({ kb, session, messages, isStreaming, isLoading
             {isStreaming && <span className="ml-2" style={{ color: 'var(--text-secondary)' }}>生成中...</span>}
           </p>
         </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            onClick={() => {
+              if (showSearch) {
+                setShowSearch(false); setSearchQuery('')
+              } else { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 50) }
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] interactive"
+            style={{ color: showSearch ? 'var(--text-primary)' : 'var(--text-tertiary)', background: showSearch ? 'var(--bg-hover)' : 'transparent' }}
+            title="搜索消息 (Ctrl+F)"
+            aria-label="搜索消息"
+          >
+            <Search className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] interactive disabled:opacity-50"
+            style={{ color: 'var(--text-tertiary)' }}
+            title="导出会话为 Markdown"
+            aria-label="导出会话"
+          >
+            {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+          </button>
+        </div>
       </div>
+
+      {/* Search bar */}
+      {showSearch && (
+        <div
+          className="px-5 py-2.5 flex items-center gap-2 flex-shrink-0 animate-fade-in"
+          style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-elevated)' }}
+        >
+          <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text-disabled)' }} />
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="搜索消息内容... (Enter 下一条, Shift+Enter 上一条, Esc 关闭)"
+            className="flex-1 text-sm bg-transparent focus:outline-none"
+            style={{ color: 'var(--text-primary)' }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') { setShowSearch(false); setSearchQuery('') }
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                const el = messagesEndRef.current?.parentElement
+                if (el) el.scrollBy(0, e.shiftKey ? -200 : 200)
+              }
+            }}
+          />
+          {searchQuery && (
+            <span className="text-[11px]" style={{ color: 'var(--text-disabled)' }}>
+              {messages.filter((m) => !m.streaming && m.content.toLowerCase().includes(searchQuery.toLowerCase())).length} 条
+            </span>
+          )}
+          <button
+            onClick={() => { setShowSearch(false); setSearchQuery('') }}
+            className="interactive p-1 rounded"
+            style={{ color: 'var(--text-disabled)' }}
+            aria-label="关闭搜索"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Messages */}
       <div
@@ -731,9 +878,12 @@ export default function ChatArea({ kb, session, messages, isStreaming, isLoading
               msg={msg}
               isStreaming={isStreaming}
               onRetrace={onRetrace}
+              onRequestCancel={(draft) => setCancelConfirm({ draft, msgId: msg.id })}
+              highlightFn={highlightText}
+              searchQuery={searchQuery}
             />
           ) : (
-            <AssistantBubble key={msg.id} msg={msg} onRetry={onSend} />
+            <AssistantBubble key={msg.id} msg={msg} onRetry={onSend} highlightFn={highlightText} searchQuery={searchQuery} />
           )
         )}
 <div ref={bottomRef} />
@@ -855,6 +1005,18 @@ export default function ChatArea({ kb, session, messages, isStreaming, isLoading
           }
         </p>
       </div>
+      {cancelConfirm && (
+        <ConfirmDialog
+          open={true}
+          title="放弃修改？"
+          message="编辑内容尚未保存，确定放弃？"
+          confirmLabel="放弃"
+          cancelLabel="继续编辑"
+          destructive={true}
+          onConfirm={() => setCancelConfirm(null)}
+          onCancel={() => setCancelConfirm(null)}
+        />
+      )}
     </div>
   )
 }

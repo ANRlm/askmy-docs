@@ -10,6 +10,25 @@ from services.llm_service import chat_completion_stream
 from services.memory_service import compress_history
 from loguru import logger
 
+
+async def log_retrieval(db, message_id: int, sources: list[dict]) -> None:
+    """将检索到的 chunks 写入 RetrievalLog 表"""
+    from models.feedback import RetrievalLog
+
+    if not sources:
+        return
+
+    db.add_all([
+        RetrievalLog(
+            message_id=message_id,
+            document_id=int(s["document_id"]) if s.get("document_id") else None,
+            chunk_index=s["chunk_index"],
+            chunk_text=s["text"][:1000],
+            score=s["score"],
+        )
+        for s in sources
+    ])
+
 # Redis cache key prefix
 _CACHE_KEY_PREFIX = "rag_cache"
 _CACHE_TTL_SECONDS = 3600  # 1 hour

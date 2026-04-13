@@ -1,5 +1,6 @@
 import asyncio
 import json
+import secrets
 import time
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
@@ -11,11 +12,10 @@ from models.user import User
 from models.knowledge_base import KnowledgeBase
 from models.session import Session
 from models.message import Message
-from models.feedback import RetrievalLog
 from middleware.auth import get_current_user
 from middleware.rate_limit import check_rate_limit
 from services.rag_service import (
-    rag_chat_stream, get_new_summary
+    rag_chat_stream, get_new_summary, log_retrieval
 )
 from loguru import logger
 
@@ -96,8 +96,8 @@ async def list_sessions(
     ]
 
 
-@router.get("/api/sessions/{session_id}/messages", summary="获取历史消息")
-async def get_messages(
+@router.post("/api/sessions/{session_id}/share", summary="生成分享链接")
+async def create_share_link(
     session_id: int,
     request: Request,
     current_user: User = Depends(get_current_user),
@@ -111,11 +111,81 @@ async def get_messages(
     if not session:
         raise HTTPException(status_code=404, detail="会话不存在")
 
+    if not session.share_token:
+        session.share_token = secrets.token_urlsafe(32)
+        await db.commit()
+
+    return {"share_url": f"/api/share/{session.share_token}"}
+
+
+@router.get("/api/share/{token}", summary="公开只读访问分享会话")
+async def get_shared_session(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+):
     result = await db.execute(
-        select(Message).where(Message.session_id == session_id).order_by(Message.created_at)
+        select(Session).where(Session.share_token == token)
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="分享链接无效或已失效")
+
+    result = await db.execute(
+        select(Message).where(Message.session_id == session.id).order_by(Message.created_at)
     )
     messages = result.scalars().all()
-    return [
+    return {
+        "id": session.id,
+        "title": session.title,
+        "kb_id": session.kb_id,
+        "messages": [
+            {
+                "id": m.id,
+                "role": m.role,
+                "content": m.content,
+                "sources": m.sources,
+                "created_at": m.created_at,
+            }
+            for m in messages
+        ],
+    }
+
+
+@router.get("/api/sessions/{session_id}/messages", summary="获取历史消息")
+async def get_messages(
+    session_id: int,
+    request: Request,
+    cursor: int | None = Query(None, description="上一页最后一条消息的 ID"),
+    limit: int = Query(50, ge=1, le=200, description="每页数量"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await check_rate_limit(request, current_user.id)
+    result = await db.execute(
+        select(Session).where(Session.id == session_id, Session.user_id == current_user.id)
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="会话不存在")
+
+    query = select(Message).where(Message.session_id == session_id)
+    if cursor is not None:
+        cursor_result = await db.execute(
+            select(Message.created_at).where(Message.id == cursor, Message.session_id == session_id)
+        )
+        cursor_row = cursor_result.scalar_one_or_none()
+        if cursor_row is None:
+            raise HTTPException(status_code=400, detail="无效的 cursor")
+        query = query.where(Message.created_at < cursor_row)
+
+    query = query.order_by(Message.created_at.desc()).limit(limit)
+    result = await db.execute(query)
+    messages = list(result.scalars().all())
+
+    has_more = len(messages) == limit
+    next_cursor = messages[-1].id if has_more and messages else None
+
+    messages_serialized = [
         {
             "id": m.id,
             "role": m.role,
@@ -123,8 +193,13 @@ async def get_messages(
             "sources": m.sources,
             "created_at": m.created_at,
         }
-        for m in messages
+        for m in reversed(messages)
     ]
+    return {
+        "messages": messages_serialized,
+        "next_cursor": next_cursor,
+        "has_more": has_more,
+    }
 
 
 @router.post("/api/sessions/{session_id}/chat", summary="发送消息（流式）")
@@ -270,16 +345,7 @@ async def chat(
                     )
                     db.add(assistant_msg)
                     await db.flush()
-                    db.add_all([
-                        RetrievalLog(
-                            message_id=assistant_msg.id,
-                            document_id=int(s["document_id"]) if s.get("document_id") else None,
-                            chunk_index=s["chunk_index"],
-                            chunk_text=s["text"][:1000],
-                            score=s["score"],
-                        )
-                        for s in sources
-                    ])
+                    await log_retrieval(db, assistant_msg.id, sources)
                 assistant_msg_id = assistant_msg.id
             except Exception as e:
                 logger.error(f"保存 assistant 消息失败: {e}")
@@ -319,6 +385,39 @@ async def delete_session(
     await db.delete(session)
     await db.commit()
     return {"message": "会话已删除"}
+
+
+@router.delete("/api/messages/{message_id}", status_code=204, summary="删除消息")
+async def delete_message(
+    message_id: int,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await check_rate_limit(request, current_user.id)
+
+    result = await db.execute(
+        select(Message).where(Message.id == message_id)
+    )
+    message = result.scalar_one_or_none()
+    if not message:
+        raise HTTPException(status_code=404, detail="消息不存在")
+
+    # IDOR check: verify the message's session belongs to the current user
+    session_result = await db.execute(
+        select(Session).where(Session.id == message.session_id, Session.user_id == current_user.id)
+    )
+    if not session_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="消息不存在")
+
+    # Cascade delete RetrievalLog records (Feedback via CASCADE)
+    from models.feedback import RetrievalLog
+    await db.execute(
+        delete(RetrievalLog).where(RetrievalLog.message_id == message_id)
+    )
+
+    await db.delete(message)
+    await db.commit()
 
 
 @router.post("/api/sessions/{session_id}/retrace", summary="回溯并重新生成（修改历史消息）")
@@ -433,16 +532,7 @@ async def retrace_chat(
                     )
                     db.add(assistant_msg)
                     await db.flush()
-                    db.add_all([
-                        RetrievalLog(
-                            message_id=assistant_msg.id,
-                            document_id=int(s["document_id"]) if s.get("document_id") else None,
-                            chunk_index=s["chunk_index"],
-                            chunk_text=s["text"][:1000],
-                            score=s["score"],
-                        )
-                        for s in sources
-                    ])
+                    await log_retrieval(db, assistant_msg.id, sources)
                 assistant_msg_id = assistant_msg.id
             except Exception as e:
                 logger.error(f"保存回溯消息失败: {e}")

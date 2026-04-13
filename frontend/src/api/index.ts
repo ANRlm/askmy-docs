@@ -201,6 +201,26 @@ function _streamChat(
   return () => ctrl.abort()
 }
 
+// Session export
+export async function exportSession(sessionId: number): Promise<string> {
+  const messages = await getMessages(sessionId)
+  const lines: string[] = ['# 会话导出\n']
+  for (const msg of messages) {
+    const role = msg.role === 'user' ? '**用户**' : '**AI**'
+    const time = msg.created_at ? new Date(msg.created_at).toLocaleString('zh-CN') : ''
+    lines.push(`\n## ${role}${time ? ` — ${time}` : ''}\n`)
+    lines.push(`${msg.content}\n`)
+    if (msg.sources && msg.sources.length > 0) {
+      lines.push('\n**参考来源:**\n')
+      for (const s of msg.sources) {
+        lines.push(`- [${s.filename} #${s.chunk_index}] ${s.text.slice(0, 200)}...`)
+      }
+      lines.push('')
+    }
+  }
+  return lines.join('\n')
+}
+
 // Voice
 export async function submitFeedback(messageId: number, rating: 1 | -1): Promise<void> {
   return request(`/messages/${messageId}/feedback`, {

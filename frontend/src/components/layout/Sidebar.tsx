@@ -8,6 +8,7 @@ import type { KnowledgeBase, Session } from '../../types'
 import { useAuth } from '../../hooks/useAuth'
 import DocumentModal from '../kb/DocumentModal'
 import KbSettingsModal from '../kb/KbSettingsModal'
+import ConfirmDialog from '../ui/ConfirmDialog'
 
 interface Props {
   selectedKb: KnowledgeBase | null
@@ -20,11 +21,15 @@ interface Props {
   onSessionRenamed?: (session: Session) => void
   onKbDeleted?: (kbId: number) => void
   onKbUpdated?: (kb: KnowledgeBase) => void
+  isMobile?: boolean
+  drawerOpen?: boolean
+  onCloseDrawer?: () => void
 }
 
 export default function Sidebar({
   selectedKb, selectedSession, collapsed, onToggleCollapse,
   onSelectKb, onSelectSession, onNewSession, onSessionRenamed, onKbDeleted, onKbUpdated,
+  isMobile, drawerOpen, onCloseDrawer,
 }: Props) {
   const { user, logout } = useAuth()
   const [kbs, setKbs] = useState<KnowledgeBase[]>([])
@@ -37,9 +42,17 @@ export default function Sidebar({
   const [newKbDesc, setNewKbDesc] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
 
-  const [renamingSessionId, setRenamingSessionId] = useState<number | null>(null)
+const [renamingSessionId, setRenamingSessionId] = useState<number | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const renameInputRef = useRef<HTMLInputElement>(null)
+
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    title: string
+    message?: string
+    destructive?: boolean
+    onConfirm: () => void
+  } | null>(null)
 
   const loadSessionsAbortRef = useRef<AbortController | null>(null)
 
@@ -92,17 +105,24 @@ export default function Sidebar({
     } catch {}
   }
 
-  const handleDeleteSession = async (e: React.MouseEvent, sessionId: number, kbId: number) => {
+  const handleDeleteSession = (e: React.MouseEvent, sessionId: number, kbId: number) => {
     e.stopPropagation()
-    if (!confirm('确定删除此会话？')) return
-    try {
-      await api.deleteSession(sessionId)
-      setSessionsByKb((prev) => {
-        const next = new Map(prev)
-        next.set(kbId, (next.get(kbId) ?? []).filter((s) => s.id !== sessionId))
-        return next
-      })
-    } catch {}
+    setConfirmDialog({
+      open: true,
+      title: '删除会话',
+      message: '确定删除此会话？此操作不可撤销。',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await api.deleteSession(sessionId)
+          setSessionsByKb((prev) => {
+            const next = new Map(prev)
+            next.set(kbId, (next.get(kbId) ?? []).filter((s) => s.id !== sessionId))
+            return next
+          })
+        } catch {}
+      },
+    })
   }
 
   const handleDoubleClickSession = (e: React.MouseEvent, session: Session) => {
@@ -151,15 +171,22 @@ export default function Sidebar({
     } catch {}
   }
 
-  const handleDeleteKb = async (e: React.MouseEvent, kbId: number) => {
+  const handleDeleteKb = (e: React.MouseEvent, kbId: number) => {
     e.stopPropagation()
-    if (!confirm('确定删除此知识库？所有文档和会话将被永久删除。')) return
-    try {
-      await api.deleteKB(kbId)
-      setKbs((prev) => prev.filter((k) => k.id !== kbId))
-      setSessionsByKb((prev) => { const n = new Map(prev); n.delete(kbId); return n })
-      onKbDeleted?.(kbId)
-    } catch {}
+    setConfirmDialog({
+      open: true,
+      title: '删除知识库',
+      message: '确定删除此知识库？所有文档和会话将被永久删除。此操作不可撤销。',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await api.deleteKB(kbId)
+          setKbs((prev) => prev.filter((k) => k.id !== kbId))
+          setSessionsByKb((prev) => { const n = new Map(prev); n.delete(kbId); return n })
+          onKbDeleted?.(kbId)
+        } catch {}
+      },
+    })
   }
 
   const q = searchQuery.trim().toLowerCase()
@@ -173,56 +200,51 @@ export default function Sidebar({
 
   const collapsedWidth = 56
 
-  return (
-    <>
-      <aside
-        className="flex-shrink-0 flex flex-col h-full sidebar-collapse relative"
-        style={{
-          width: collapsed ? collapsedWidth : 240,
-          minWidth: collapsed ? collapsedWidth : 240,
-          background: 'var(--bg-sidebar)',
-          borderRight: '1px solid var(--border)',
-        }}
+  const sidebarBody = (
+    <div
+      className={`flex flex-col h-full ${isMobile ? 'w-[280px] max-w-[85vw]' : ''}`}
+      style={{ background: 'var(--bg-sidebar)', width: isMobile ? undefined : (collapsed ? collapsedWidth : 240) }}
+    >
+      {/* Header */}
+      <div
+        className="w-full px-2 py-3 flex flex-col items-center gap-2"
+        style={{ borderBottom: '1px solid var(--border)' }}
       >
-        {/* Logo + collapse toggle */}
+        {/* Logo Icon */}
         <div
-          className="w-full px-2 py-3 flex flex-col items-center gap-2"
-          style={{ borderBottom: '1px solid var(--border)' }}
+          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ background: 'var(--bg-active)', border: '1px solid var(--border-strong)' }}
         >
-          {/* Logo Icon */}
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ background: 'var(--bg-active)', border: '1px solid var(--border-strong)' }}
-          >
-            <BookOpen className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
-          </div>
-          
-          {/* Full logo text (visible when expanded) */}
-          {!collapsed && (
-            <span
-              className="font-semibold text-[13px] tracking-tight text-center w-full truncate px-1"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              AskMyDocs
-            </span>
-          )}
-          
-          {/* Collapsed single letter */}
-          {collapsed && (
-            <span
-              className="font-semibold text-[12px]"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              A
-            </span>
-          )}
+          <BookOpen className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
         </div>
-        
-        {/* Collapse toggle button - always visible */}
+
+        {/* Full logo text (visible when expanded) */}
+        {!collapsed && !isMobile && (
+          <span
+            className="font-semibold text-[13px] tracking-tight text-center w-full truncate px-1"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            AskMyDocs
+          </span>
+        )}
+
+        {/* Collapsed single letter */}
+        {collapsed && !isMobile && (
+          <span
+            className="font-semibold text-[12px]"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            A
+          </span>
+        )}
+      </div>
+
+      {/* Desktop collapse toggle */}
+      {!isMobile && (
         <button
           onClick={onToggleCollapse}
           className="absolute top-1/2 -translate-y-1/2 interactive-icon w-5 h-5 rounded flex items-center justify-center"
-          style={{ 
+          style={{
             color: 'var(--text-tertiary)',
             left: collapsed ? '50%' : 'auto',
             right: collapsed ? 'auto' : '8px',
@@ -232,6 +254,7 @@ export default function Sidebar({
         >
           <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-200 ${collapsed ? '' : 'rotate-180'}`} />
         </button>
+      )}
 
         {/* Search — hidden when collapsed */}
         {!collapsed && (
@@ -501,8 +524,74 @@ export default function Sidebar({
           </div>
         </div>
         )}
-      </aside>
+    </div>
+  )
 
+  // Mobile: render as overlay drawer with backdrop
+  if (isMobile) {
+    if (!drawerOpen) return null
+    return (
+      <>
+        {/* Backdrop */}
+        <div
+          className="fixed inset-0 z-40 animate-fade-in"
+          style={{ background: 'rgba(0,0,0,0.5)' }}
+          onClick={onCloseDrawer}
+          aria-hidden="true"
+        />
+        {/* Drawer */}
+        <div
+          className="fixed left-0 top-0 bottom-0 z-50 animate-slide-right flex-shrink-0 flex flex-col h-full"
+          style={{ width: '280px', maxWidth: '85vw' }}
+        >
+          {sidebarBody}
+        </div>
+        {docModalKb && (
+          <DocumentModal kb={docModalKb} onClose={() => setDocModalKb(null)} />
+        )}
+        {settingsModalKb && (
+          <KbSettingsModal
+            kb={settingsModalKb}
+            onClose={() => setSettingsModalKb(null)}
+            onUpdated={(updated) => {
+              setKbs((prev) => prev.map((k) => k.id === updated.id ? updated : k))
+              onKbUpdated?.(updated)
+            }}
+          />
+        )}
+        {confirmDialog && (
+          <ConfirmDialog
+            open={confirmDialog.open}
+            title={confirmDialog.title}
+            message={confirmDialog.message}
+            confirmLabel="删除"
+            cancelLabel="取消"
+            destructive={confirmDialog.destructive}
+            onConfirm={() => {
+              confirmDialog.onConfirm()
+              setConfirmDialog(null)
+            }}
+            onCancel={() => setConfirmDialog(null)}
+          />
+        )}
+      </>
+    )
+  }
+
+  // Desktop: inline sidebar
+  return (
+    <>
+      <aside
+        className="flex-shrink-0 flex flex-col h-full sidebar-collapse relative"
+        style={{
+          width: collapsed ? collapsedWidth : 240,
+          minWidth: collapsed ? collapsedWidth : 240,
+          background: 'var(--bg-sidebar)',
+          borderRight: '1px solid var(--border)',
+        }}
+      >
+        {sidebarBody}
+      </aside>
       {docModalKb && (
         <DocumentModal kb={docModalKb} onClose={() => setDocModalKb(null)} />
       )}
@@ -514,6 +603,21 @@ export default function Sidebar({
             setKbs((prev) => prev.map((k) => k.id === updated.id ? updated : k))
             onKbUpdated?.(updated)
           }}
+        />
+      )}
+      {confirmDialog && (
+        <ConfirmDialog
+          open={confirmDialog.open}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmLabel="删除"
+          cancelLabel="取消"
+          destructive={confirmDialog.destructive}
+          onConfirm={() => {
+            confirmDialog.onConfirm()
+            setConfirmDialog(null)
+          }}
+          onCancel={() => setConfirmDialog(null)}
         />
       )}
     </>

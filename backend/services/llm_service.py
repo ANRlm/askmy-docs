@@ -30,7 +30,13 @@ async def chat_completion_stream(messages: list[dict]) -> AsyncGenerator[str, No
             max_tokens=3000,
             timeout=120.0,
         )
+        chunk_count = 0
         async for chunk in stream:
+            # Check for cancellation every 8 chunks
+            if chunk_count % 8 == 0 and asyncio.current_task().done():
+                logger.debug("Stream cancelled by client")
+                break
+            chunk_count += 1
             if chunk.choices and chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
     except Exception as e:

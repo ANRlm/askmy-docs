@@ -5,8 +5,10 @@ import Sidebar from './components/layout/Sidebar'
 import ChatArea from './components/chat/ChatArea'
 import { ToastProvider, useToast } from './components/ui/Toast'
 import CommandPalette from './components/ui/CommandPalette'
+import KeyboardShortcutsModal from './components/ui/KeyboardShortcutsModal'
 import { useCommandPalette } from './hooks/useCommandPalette'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
+import { useBreakpoint } from './hooks/useBreakpoint'
 import type { CommandItem } from './components/ui/CommandPalette'
 import type { KnowledgeBase, Session, Message, Source } from './types'
 import * as api from './api'
@@ -17,9 +19,12 @@ function AppInner() {
   const { toast } = useToast()
   const { commandPaletteOpen, openCommandPalette, closeCommandPalette } = useCommandPalette()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const isMobile = useBreakpoint()
   const [commandPaletteItems, setCommandPaletteItems] = useState<CommandItem[]>([])
   const [selectedKb, setSelectedKb] = useState<KnowledgeBase | null>(null)
   const [selectedSession, setSelectedSession] = useState<Session | null>(null)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
   // Keep a stable ref to toast to avoid loadCommandPaletteItems recreating on every render
   const toastRef = useRef(toast)
@@ -126,7 +131,8 @@ function AppInner() {
     { key: 'k', metaKey: true, action: () => commandPaletteOpen ? closeCommandPalette() : openCommandPalette() },
     { key: 'b', metaKey: true, action: () => setSidebarCollapsed((c) => !c) },
     { key: 'n', metaKey: true, action: () => { if (selectedKb) api.createSession(selectedKb.id).then(handleNewSession).catch((e) => toast(e.message, 'error')) } },
-    { key: 'Escape', action: () => closeCommandPalette() },
+    { key: 'Escape', action: () => commandPaletteOpen ? closeCommandPalette() : shortcutsOpen ? setShortcutsOpen(false) : closeCommandPalette() },
+    { key: '?', action: () => setShortcutsOpen((o) => !o) },
   ], !!token)
 
   const flushStreamingContent = useCallback((sessionId: number) => {
@@ -163,6 +169,7 @@ function AppInner() {
   }
 
   const handleSelectSession = (session: Session) => {
+    if (isMobile) setDrawerOpen(false)
     const prev = selectedSession
     if (prev) {
       if (stopRefs.current.has(prev.id)) {
@@ -393,6 +400,9 @@ function AppInner() {
         onSessionRenamed={handleSessionRenamed}
         onKbDeleted={handleKbDeleted}
         onKbUpdated={(kb) => { if (selectedKb?.id === kb.id) setSelectedKb(kb) }}
+        isMobile={isMobile}
+        drawerOpen={drawerOpen}
+        onCloseDrawer={() => setDrawerOpen(false)}
       />
       <main className="flex-1 flex overflow-hidden">
         <ChatArea
@@ -404,12 +414,44 @@ function AppInner() {
           onSend={handleSend}
           onStop={handleStop}
           onRetrace={handleRetrace}
+          isMobile={isMobile}
+          onOpenDrawer={() => setDrawerOpen(true)}
         />
       </main>
       <CommandPalette
         open={commandPaletteOpen}
         onClose={closeCommandPalette}
         items={commandPaletteItems}
+      />
+      <KeyboardShortcutsModal
+        open={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+        categories={[
+          {
+            name: '全局',
+            shortcuts: [
+              { key: '?', label: '快捷键帮助' },
+              { key: 'Cmd+K', label: '命令面板' },
+              { key: 'Cmd+B', label: '折叠/展开侧边栏' },
+              { key: 'Cmd+N', label: '新建会话' },
+            ],
+          },
+          {
+            name: '会话',
+            shortcuts: [
+              { key: 'Enter', label: '发送消息' },
+              { key: 'Shift+Enter', label: '换行' },
+              { key: 'Escape', label: '关闭弹窗/停止生成' },
+            ],
+          },
+          {
+            name: '导航',
+            shortcuts: [
+              { key: 'ArrowUp/Down', label: '命令面板中选择' },
+              { key: 'Enter', label: '执行命令面板选项' },
+            ],
+          },
+        ]}
       />
     </div>
   )
