@@ -40,6 +40,11 @@ docker compose ps
 - **前端界面**：http://localhost:3000
 - **API 文档**：http://localhost:8000/docs
 
+> **已有数据库升级**：如果之前已有数据库，需手动运行迁移添加新列：
+> ```bash
+> cd backend && PYTHONPATH=. python -m migrations.add_email_verification
+> ```
+
 ---
 
 ## 服务架构
@@ -89,6 +94,7 @@ worker   (RQ Worker)
 
 **用户系统**
 - 注册、登录、JWT 鉴权
+- 邮箱验证、密码重置（通过 SMTP 邮件）
 - 接口限流：滑动窗口，每用户每分钟 30 次
 
 **知识库管理**
@@ -173,6 +179,7 @@ worker   (RQ Worker)
 | 最新 | 缺少手动主题切换 | 添加 `useTheme` hook + 侧边栏切换按钮，支持手动明暗切换并持久化到 localStorage |
 | 最新 | 缺少邮箱验证/密码重置 | 添加验证邮件发送、邮箱验证、密码重置端点；新增 PasswordResetToken 模型；支持 SMTP 配置 |
 | 最新 | 缺少文档全文搜索 | 添加 POST /kb/{id}/documents/search 端点，支持关键词全文检索 |
+| 最新 | 注册/登录 HTTP 500 | 邮箱验证新增列未迁移到已有数据库，添加迁移脚本 `add_email_verification.py` |
 
 ---
 
