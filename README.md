@@ -171,7 +171,6 @@ worker   (RQ Worker)
 | 最新 | Bundle 大小超过 1MB | 启用 code-splitting，将 react/markdown/ui 库分离为独立 chunk |
 | 最新 | 缺少测试基础设施 | 添加 pytest 后端测试 + Vitest 前端测试，security 模块 6 个测试全部通过 |
 | 最新 | 缺少手动主题切换 | 添加 `useTheme` hook + 侧边栏切换按钮，支持手动明暗切换并持久化到 localStorage |
-| 最新 | 缺少国际化基础设施 | 添加 i18next + react-i18next，创建 zh/en 翻译文件，基础设施已就绪，可逐步重hardcoded 字符串 |
 | 最新 | 缺少邮箱验证/密码重置 | 添加验证邮件发送、邮箱验证、密码重置端点；新增 PasswordResetToken 模型；支持 SMTP 配置 |
 | 最新 | 缺少文档全文搜索 | 添加 POST /kb/{id}/documents/search 端点，支持关键词全文检索 |
 
