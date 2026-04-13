@@ -757,7 +757,7 @@ export default function ChatArea({ kb, session, messages, isStreaming, isLoading
     <div className="flex-1 flex flex-col min-w-0 h-full" style={{ background: 'var(--bg-panel)' }}>
       {/* Header */}
       <div
-        className="px-5 py-3.5 flex items-center gap-3 flex-shrink-0"
+        className="px-4 py-3 flex items-center gap-3 flex-shrink-0"
         style={{ borderBottom: '1px solid var(--border)' }}
       >
         {/* Status indicator */}
