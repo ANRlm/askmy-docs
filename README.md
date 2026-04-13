@@ -161,7 +161,7 @@ worker   (RQ Worker)
 | — | 文档上传后一直"待处理" | worker 未导入全部模型导致外键报错；修复 import |
 | — | Embedding API 400 错误 | batch_size 从 20 改为 10（阿里百炼上限） |
 | — | 侧边栏会话偶尔消失 | sessions 改为按知识库独立缓存，消除竞态 |
-| 最新 | Chroma 同步调用阻塞事件循环 | 新增 get_collection_async()，所有 Chroma 操作使用 asyncio.to_thread() |
+| 最新 | 前端点击会话后 `k.map is not a function` 报错 | 后端 /sessions/{id}/messages 返回 `{messages: [...]}` 对象，前端未解包直接调用 .map() |
 | 最新 | 前端 Toast 组件 progress 状态导致事件监听器频繁重新绑定 | 使用 progressRef 替代 progress 依赖 |
 | 最新 | 前端未使用变量/导入未清理 | 启用 strict TypeScript，清理所有未使用代码 |
 | 最新 | Bundle 大小超过 1MB | 启用 code-splitting，将 react/markdown/ui 库分离为独立 chunk |
