@@ -1,17 +1,14 @@
 import asyncio
 import hashlib
 import json
-from concurrent.futures import ThreadPoolExecutor
 from typing import AsyncGenerator
 
 from chroma_client import get_collection
 from redis_client import redis_client
 from services.embedding_service import get_embedding
-from services.llm_service import chat_completion_stream, simple_chat
+from services.llm_service import chat_completion_stream
 from services.memory_service import compress_history
 from loguru import logger
-
-_chroma_executor = ThreadPoolExecutor(max_workers=10)
 
 # Redis cache key prefix
 _CACHE_KEY_PREFIX = "rag_cache"
@@ -80,7 +77,7 @@ async def retrieve_chunks(kb_id: int, query: str, top_k: int = 5, score_threshol
             include=["documents", "metadatas", "distances"],
         )
 
-    results = await asyncio.run_in_executor(_chroma_executor, _query)
+    results = await asyncio.to_thread(_query)
 
     chunks = []
     if results and results["documents"]:

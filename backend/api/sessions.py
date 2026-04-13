@@ -223,6 +223,7 @@ async def chat(
     async def event_generator():
         full_response = []
         sources = []
+        assistant_msg_id = None
 
         try:
             async for text_chunk, chunk_sources in rag_chat_stream(
@@ -242,50 +243,51 @@ async def chat(
         except Exception as e:
             logger.error(f"RAG 流式生成失败: {e}", exc_info=True)
             yield f"data: {json.dumps({'type': 'error', 'content': '生成回答时发生错误'}, ensure_ascii=False)}\n\n"
-            return
 
-        # 保存 assistant 回答 + 检索日志（一次事务，一次提交）
-        response_time = time.time() - start_time
-        assistant_content = "".join(full_response)
+        # finally 确保 done 一定发送（即使中间抛异常也不例外）
+        finally:
+            response_time = time.time() - start_time
+            assistant_content = "".join(full_response)
 
-        sources_data = [
-            {
-                "filename": s["filename"],
-                "chunk_index": s["chunk_index"],
-                "text": s["text"][:300],
-                "score": round(s["score"], 4),
-            }
-            for s in sources
-        ]
-
-        async with db.begin():
-            assistant_msg = Message(
-                session_id=session_id,
-                role="assistant",
-                content=assistant_content,
-                sources=sources_data,
-                response_time=response_time,
-            )
-            db.add(assistant_msg)
-            await db.flush()  # 获取 assistant_msg.id（不提交事务）
-            # 批量保存检索日志
-            db.add_all([
-                RetrievalLog(
-                    message_id=assistant_msg.id,
-                    document_id=int(s["document_id"]) if s.get("document_id") else None,
-                    chunk_index=s["chunk_index"],
-                    chunk_text=s["text"][:1000],
-                    score=s["score"],
-                )
+            sources_data = [
+                {
+                    "filename": s["filename"],
+                    "chunk_index": s["chunk_index"],
+                    "text": s["text"][:300],
+                    "score": round(s["score"], 4),
+                }
                 for s in sources
-            ])
-        # 事务自动提交
+            ]
 
-        assistant_msg_id = assistant_msg.id
+            try:
+                async with db.begin():
+                    assistant_msg = Message(
+                        session_id=session_id,
+                        role="assistant",
+                        content=assistant_content,
+                        sources=sources_data,
+                        response_time=response_time,
+                    )
+                    db.add(assistant_msg)
+                    await db.flush()
+                    db.add_all([
+                        RetrievalLog(
+                            message_id=assistant_msg.id,
+                            document_id=int(s["document_id"]) if s.get("document_id") else None,
+                            chunk_index=s["chunk_index"],
+                            chunk_text=s["text"][:1000],
+                            score=s["score"],
+                        )
+                        for s in sources
+                    ])
+                assistant_msg_id = assistant_msg.id
+            except Exception as e:
+                logger.error(f"保存 assistant 消息失败: {e}")
 
-        # 发送 sources 事件
-        yield f"data: {json.dumps({'type': 'sources', 'content': sources_data}, ensure_ascii=False)}\n\n"
-        yield f"data: {json.dumps({'type': 'done', 'message_id': assistant_msg_id}, ensure_ascii=False)}\n\n"
+            if sources_data:
+                yield f"data: {json.dumps({'type': 'sources', 'content': sources_data}, ensure_ascii=False)}\n\n"
+            if assistant_msg_id is not None:
+                yield f"data: {json.dumps({'type': 'done', 'message_id': assistant_msg_id}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
         event_generator(),
@@ -385,6 +387,7 @@ async def retrace_chat(
     async def event_generator():
         full_response = []
         sources = []
+        assistant_msg_id = None
 
         try:
             async for text_chunk, chunk_sources in rag_chat_stream(
@@ -404,47 +407,51 @@ async def retrace_chat(
         except Exception as e:
             logger.error(f"回溯 RAG 流式生成失败: {e}", exc_info=True)
             yield f"data: {json.dumps({'type': 'error', 'content': '生成回答时发生错误'}, ensure_ascii=False)}\n\n"
-            return
 
-        response_time = time.time() - start_time
-        assistant_content = "".join(full_response)
+        finally:
+            response_time = time.time() - start_time
+            assistant_content = "".join(full_response)
 
-        sources_data = [
-            {
-                "filename": s["filename"],
-                "chunk_index": s["chunk_index"],
-                "text": s["text"][:300],
-                "score": round(s["score"], 4),
-            }
-            for s in sources
-        ]
-
-        async with db.begin():
-            assistant_msg = Message(
-                session_id=session_id,
-                role="assistant",
-                content=assistant_content,
-                sources=sources_data,
-                response_time=response_time,
-            )
-            db.add(assistant_msg)
-            await db.flush()
-            db.add_all([
-                RetrievalLog(
-                    message_id=assistant_msg.id,
-                    document_id=int(s["document_id"]) if s.get("document_id") else None,
-                    chunk_index=s["chunk_index"],
-                    chunk_text=s["text"][:1000],
-                    score=s["score"],
-                )
+            sources_data = [
+                {
+                    "filename": s["filename"],
+                    "chunk_index": s["chunk_index"],
+                    "text": s["text"][:300],
+                    "score": round(s["score"], 4),
+                }
                 for s in sources
-            ])
+            ]
 
-        assistant_msg_id = assistant_msg.id
+            try:
+                async with db.begin():
+                    assistant_msg = Message(
+                        session_id=session_id,
+                        role="assistant",
+                        content=assistant_content,
+                        sources=sources_data,
+                        response_time=response_time,
+                    )
+                    db.add(assistant_msg)
+                    await db.flush()
+                    db.add_all([
+                        RetrievalLog(
+                            message_id=assistant_msg.id,
+                            document_id=int(s["document_id"]) if s.get("document_id") else None,
+                            chunk_index=s["chunk_index"],
+                            chunk_text=s["text"][:1000],
+                            score=s["score"],
+                        )
+                        for s in sources
+                    ])
+                assistant_msg_id = assistant_msg.id
+            except Exception as e:
+                logger.error(f"保存回溯消息失败: {e}")
 
-        yield f"data: {json.dumps({'type': 'user_msg_id', 'message_id': user_msg.id}, ensure_ascii=False)}\n\n"
-        yield f"data: {json.dumps({'type': 'sources', 'content': sources_data}, ensure_ascii=False)}\n\n"
-        yield f"data: {json.dumps({'type': 'done', 'message_id': assistant_msg_id}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'user_msg_id', 'message_id': user_msg.id}, ensure_ascii=False)}\n\n"
+            if sources_data:
+                yield f"data: {json.dumps({'type': 'sources', 'content': sources_data}, ensure_ascii=False)}\n\n"
+            if assistant_msg_id is not None:
+                yield f"data: {json.dumps({'type': 'done', 'message_id': assistant_msg_id}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
         event_generator(),

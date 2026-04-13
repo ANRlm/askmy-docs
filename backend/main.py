@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -58,6 +59,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(RequestIDMiddleware)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = exc.errors()
+    logger.warning(f"RequestValidationError: {errors}")
+    messages = []
+    for err in errors:
+        loc = ".".join(str(l) for l in err["loc"] if l != "body")
+        messages.append(f"{loc}: {err['msg']}" if loc else err["msg"])
+    message = "; ".join(messages) or "请求参数验证失败"
+    return JSONResponse(
+        status_code=422,
+        content={"code": 422, "message": message},
+    )
 
 
 @app.exception_handler(Exception)
