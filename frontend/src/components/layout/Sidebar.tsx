@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   Plus, Trash2, FolderOpen, MessageSquare, ChevronDown, ChevronRight,
-  BookOpen, LogOut, Search, X, Files, Sliders, Sun, Moon, Monitor,
+  BookOpen, LogOut, Search, X, Files, Sliders, Sun, Moon, Monitor, Pencil,
 } from 'lucide-react'
 import * as api from '../../api'
 import type { KnowledgeBase, Session } from '../../types'
@@ -49,6 +49,10 @@ export default function Sidebar({
   const [renameValue, setRenameValue] = useState('')
   const renameInputRef = useRef<HTMLInputElement>(null)
 
+  const [renamingKbId, setRenamingKbId] = useState<number | null>(null)
+  const [renameKbValue, setRenameKbValue] = useState('')
+  const renameKbInputRef = useRef<HTMLInputElement>(null)
+
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean
     title: string
@@ -90,6 +94,13 @@ export default function Sidebar({
     }
   }, [renamingSessionId])
 
+  useEffect(() => {
+    if (renamingKbId !== null) {
+      renameKbInputRef.current?.focus()
+      renameKbInputRef.current?.select()
+    }
+  }, [renamingKbId])
+
   const handleSelectKb = (kb: KnowledgeBase) => {
     setExpandedKb(expandedKb === kb.id ? null : kb.id)
     onSelectKb(kb)
@@ -128,12 +139,6 @@ export default function Sidebar({
     })
   }
 
-  const handleDoubleClickSession = (e: React.MouseEvent, session: Session) => {
-    e.preventDefault(); e.stopPropagation()
-    setRenamingSessionId(session.id)
-    setRenameValue(session.title)
-  }
-
   const handleRenameSubmit = async (sessionId: number) => {
     const trimmed = renameValue.trim()
     if (!trimmed) { setRenamingSessionId(null); return }
@@ -160,6 +165,27 @@ export default function Sidebar({
   const handleRenameKeyDown = (e: React.KeyboardEvent, sessionId: number) => {
     if (e.key === 'Enter') handleRenameSubmit(sessionId)
     if (e.key === 'Escape') setRenamingSessionId(null)
+  }
+
+  const handleRenameKb = (kb: KnowledgeBase) => {
+    setRenamingKbId(kb.id)
+    setRenameKbValue(kb.name)
+  }
+
+  const handleRenameKbSubmit = async (kbId: number) => {
+    const trimmed = renameKbValue.trim()
+    if (!trimmed) { setRenamingKbId(null); return }
+    try {
+      const updated = await api.updateKB(kbId, { name: trimmed })
+      setKbs((prev) => prev.map((k) => k.id === kbId ? { ...k, name: updated.name } : k))
+      onKbUpdated?.(updated)
+    } catch {}
+    setRenamingKbId(null)
+  }
+
+  const handleRenameKbKeyDown = (e: React.KeyboardEvent, kbId: number) => {
+    if (e.key === 'Enter') handleRenameKbSubmit(kbId)
+    if (e.key === 'Escape') setRenamingKbId(null)
   }
 
   const handleCreateKb = async (e: React.FormEvent) => {
@@ -228,16 +254,6 @@ export default function Sidebar({
             style={{ color: 'var(--text-primary)' }}
           >
             AskMyDocs
-          </span>
-        )}
-
-        {/* Collapsed single letter */}
-        {collapsed && !isMobile && (
-          <span
-            className="font-semibold text-[12px]"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            A
           </span>
         )}
       </div>
@@ -381,11 +397,36 @@ export default function Sidebar({
                   }
                 </span>
                 <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" style={{ color: selectedKb?.id === kb.id ? 'var(--text-primary)' : 'var(--text-tertiary)' }} />
-                <span className="flex-1 text-[13px] text-left truncate font-medium">
-                  {kb.name}
-                </span>
+                {renamingKbId === kb.id ? (
+                  <input
+                    ref={renameKbInputRef}
+                    value={renameKbValue}
+                    onChange={(e) => setRenameKbValue(e.target.value)}
+                    onBlur={() => handleRenameKbSubmit(kb.id)}
+                    onKeyDown={(e) => handleRenameKbKeyDown(e, kb.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-1 text-[13px] rounded px-1.5 py-0.5 focus:outline-none min-w-0"
+                    style={{
+                      background: 'var(--bg-input)',
+                      border: '1px solid var(--border-accent)',
+                      color: 'var(--text-primary)',
+                    }}
+                  />
+                ) : (
+                  <span className="flex-1 text-[13px] text-left truncate font-medium">
+                    {kb.name}
+                  </span>
+                )}
                 {/* Action buttons */}
                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleRenameKb(kb) }}
+                    className="interactive-icon p-1 rounded-md"
+                    style={{ color: 'var(--text-tertiary)' }}
+                    aria-label="重命名知识库"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); setDocModalKb(kb) }}
                     className="interactive-icon p-1 rounded-md"
@@ -436,7 +477,6 @@ export default function Sidebar({
                       <div
                         key={session.id}
                         onClick={() => renamingSessionId !== session.id && onSelectSession(session)}
-                        onDoubleClick={(e) => handleDoubleClickSession(e, session)}
                         className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg mx-0.5 group cursor-pointer"
                         style={{
                           background: selectedSession?.id === session.id ? 'var(--bg-active)' : 'transparent',
@@ -462,11 +502,19 @@ export default function Sidebar({
                             }}
                           />
                         ) : (
-                          <span className="flex-1 text-[12px] truncate font-medium" title="双击重命名">
+                          <span className="flex-1 text-[12px] truncate font-medium">
                             {session.title}
                           </span>
                         )}
 
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setRenamingSessionId(session.id); setRenameValue(session.title) }}
+                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded transition-opacity interactive-icon"
+                          style={{ color: 'var(--text-tertiary)' }}
+                          aria-label="重命名会话"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
                         <button
                           onClick={(e) => handleDeleteSession(e, session.id, kb.id)}
                           className="opacity-0 group-hover:opacity-100 p-0.5 rounded transition-opacity interactive-icon"
