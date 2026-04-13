@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   Search, CornerDownLeft, ArrowRight, X,
 } from 'lucide-react'
@@ -54,6 +54,8 @@ export default function CommandPalette({ open, onClose, items, placeholder = '�
     fuzzyMatch(item.label, query) || fuzzyMatch(item.sublabel || '', query)
   )
 
+  const categories = [...new Set(items.map((i) => i.category))]
+
   useEffect(() => {
     if (open) {
       setQuery('')
@@ -101,7 +103,6 @@ export default function CommandPalette({ open, onClose, items, placeholder = '�
 
   if (!open) return null
 
-  const categories = ['action', 'kb', 'session'] as const
   const categoryLabel = { action: '操作', kb: '知识库', session: '会话' }
 
   return (
