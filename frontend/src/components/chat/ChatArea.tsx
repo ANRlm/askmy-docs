@@ -747,9 +747,7 @@ export default function ChatArea({ kb, session, messages, isStreaming, isLoading
               onRetrace={onRetrace}
             />
           ) : (
-            msg.streaming && !msg.content ? null : (
-              <AssistantBubble key={msg.id} msg={msg} onRetry={onSend} />
-            )
+            <AssistantBubble key={msg.id} msg={msg} onRetry={onSend} />
           )
         )}
         {isStreaming && messages.filter(m => m.role === 'assistant').every(m => !m.content) && (
