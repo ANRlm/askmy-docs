@@ -185,7 +185,7 @@ export default function Sidebar({
       >
         {/* Logo + collapse toggle */}
         <div
-          className="px-3 py-[14px] flex items-center gap-2"
+          className="px-3 py-[14px] flex items-center justify-between"
           style={{ borderBottom: '1px solid var(--border)' }}
         >
           <div
@@ -194,9 +194,17 @@ export default function Sidebar({
           >
             <BookOpen className="w-3.5 h-3.5" style={{ color: 'var(--text-secondary)' }} />
           </div>
+          {collapsed && (
+            <span
+              className="font-semibold text-[13.5px] tracking-tight"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              A
+            </span>
+          )}
           {!collapsed && (
             <span
-              className="font-semibold text-[13.5px] tracking-tight truncate"
+              className="font-semibold text-[13.5px] tracking-tight truncate flex-1 ml-2"
               style={{ color: 'var(--text-primary)' }}
             >
               AskMyDocs
@@ -204,7 +212,7 @@ export default function Sidebar({
           )}
           <button
             onClick={onToggleCollapse}
-            className="ml-auto interactive-icon w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
+            className="interactive-icon w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ml-2"
             style={{ color: 'var(--text-tertiary)' }}
             aria-label={collapsed ? '展开侧边栏' : '折叠侧边栏'}
           >
