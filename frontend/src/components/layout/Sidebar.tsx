@@ -171,54 +171,67 @@ export default function Sidebar({
       )
     : kbs
 
-  const collapsedWidth = 52
+  const collapsedWidth = 56
 
   return (
     <>
       <aside
-        className="flex-shrink-0 flex flex-col h-full sidebar-collapse"
+        className="flex-shrink-0 flex flex-col h-full sidebar-collapse relative"
         style={{
           width: collapsed ? collapsedWidth : 240,
+          minWidth: collapsed ? collapsedWidth : 240,
           background: 'var(--bg-sidebar)',
           borderRight: '1px solid var(--border)',
         }}
       >
         {/* Logo + collapse toggle */}
         <div
-          className="px-3 py-[14px] flex items-center justify-between"
+          className="w-full px-2 py-3 flex flex-col items-center gap-2"
           style={{ borderBottom: '1px solid var(--border)' }}
         >
+          {/* Logo Icon */}
           <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
             style={{ background: 'var(--bg-active)', border: '1px solid var(--border-strong)' }}
           >
-            <BookOpen className="w-3.5 h-3.5" style={{ color: 'var(--text-secondary)' }} />
+            <BookOpen className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
           </div>
-          {collapsed && (
-            <span
-              className="font-semibold text-[13.5px] tracking-tight"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              A
-            </span>
-          )}
+          
+          {/* Full logo text (visible when expanded) */}
           {!collapsed && (
             <span
-              className="font-semibold text-[13.5px] tracking-tight truncate flex-1 ml-2"
+              className="font-semibold text-[13px] tracking-tight text-center w-full truncate px-1"
               style={{ color: 'var(--text-primary)' }}
             >
               AskMyDocs
             </span>
           )}
-          <button
-            onClick={onToggleCollapse}
-            className="interactive-icon w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ml-2"
-            style={{ color: 'var(--text-tertiary)' }}
-            aria-label={collapsed ? '展开侧边栏' : '折叠侧边栏'}
-          >
-            <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-200 ${collapsed ? '' : 'rotate-180'}`} />
-          </button>
+          
+          {/* Collapsed single letter */}
+          {collapsed && (
+            <span
+              className="font-semibold text-[12px]"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              A
+            </span>
+          )}
         </div>
+        
+        {/* Collapse toggle button - always visible */}
+        <button
+          onClick={onToggleCollapse}
+          className="absolute top-1/2 -translate-y-1/2 interactive-icon w-5 h-5 rounded flex items-center justify-center"
+          style={{ 
+            color: 'var(--text-tertiary)',
+            left: collapsed ? '50%' : 'auto',
+            right: collapsed ? 'auto' : '8px',
+            transform: collapsed ? 'translateX(-50%) translateY(-50%)' : 'translateY(-50%)',
+          }}
+          aria-label={collapsed ? '展开侧边栏' : '折叠侧边栏'}
+        >
+          <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-200 ${collapsed ? '' : 'rotate-180'}`} />
+        </button>
 
         {/* Search — hidden when collapsed */}
         {!collapsed && (
