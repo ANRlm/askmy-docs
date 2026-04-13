@@ -4,6 +4,7 @@ import App from './App'
 import { AuthProvider } from './hooks/useAuth'
 import { CommandPaletteProvider } from './hooks/useCommandPalette'
 import ErrorBoundary from './components/ui/ErrorBoundary'
+import './i18n'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
