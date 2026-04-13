@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   Plus, Trash2, FolderOpen, MessageSquare, ChevronDown, ChevronRight,
-  BookOpen, LogOut, Search, X, Files, Sliders,
+  BookOpen, LogOut, Search, X, Files, Sliders, Sun, Moon,
 } from 'lucide-react'
 import * as api from '../../api'
 import type { KnowledgeBase, Session } from '../../types'
@@ -24,12 +24,14 @@ interface Props {
   isMobile?: boolean
   drawerOpen?: boolean
   onCloseDrawer?: () => void
+  theme?: 'dark' | 'light'
+  onToggleTheme?: () => void
 }
 
 export default function Sidebar({
   selectedKb, selectedSession, collapsed, onToggleCollapse,
   onSelectKb, onSelectSession, onNewSession, onSessionRenamed, onKbDeleted, onKbUpdated,
-  isMobile, drawerOpen, onCloseDrawer,
+  isMobile, drawerOpen, onCloseDrawer, theme = 'dark', onToggleTheme,
 }: Props) {
   const { user, logout } = useAuth()
   const [kbs, setKbs] = useState<KnowledgeBase[]>([])
@@ -499,7 +501,24 @@ export default function Sidebar({
 
         {/* User footer */}
         {!collapsed && (
-        <div className="p-2.5" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="p-2.5 flex flex-col gap-1" style={{ borderTop: '1px solid var(--border)' }}>
+          <button
+            onClick={onToggleTheme}
+            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer group interactive w-full"
+          >
+            <div
+              className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ background: 'var(--bg-active)', border: '1px solid var(--border-strong)', color: 'var(--text-secondary)' }}
+            >
+              {theme === 'dark' ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3" />}
+            </div>
+            <span
+              className="flex-1 text-[12px] truncate font-medium"
+              style={{ color: 'var(--text-tertiary)', transition: 'color 0.15s' }}
+            >
+              {theme === 'dark' ? '浅色模式' : '深色模式'}
+            </span>
+          </button>
           <div
             className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer group interactive"
             onClick={logout}

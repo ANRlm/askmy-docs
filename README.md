@@ -110,7 +110,7 @@ worker   (RQ Worker)
 **前端**
 - Vercel 风格极简设计，纯黑白灰色调
 - 双栏布局（知识库树 + 对话区）
-- 响应式设计，支持明暗主题
+- 响应式设计，支持手动切换明暗模式 + 自动检测系统主题
 - 侧边栏搜索：实时过滤知识库和会话名称
 - 会话重命名：双击会话名即可内联编辑
 - Markdown 渲染（含代码块、表格）
@@ -166,6 +166,7 @@ worker   (RQ Worker)
 | 最新 | 前端未使用变量/导入未清理 | 启用 strict TypeScript，清理所有未使用代码 |
 | 最新 | Bundle 大小超过 1MB | 启用 code-splitting，将 react/markdown/ui 库分离为独立 chunk |
 | 最新 | 缺少测试基础设施 | 添加 pytest 后端测试 + Vitest 前端测试，security 模块 6 个测试全部通过 |
+| 最新 | 缺少手动主题切换 | 添加 `useTheme` hook + 侧边栏切换按钮，支持手动明暗切换并持久化到 localStorage |
 
 ---
 

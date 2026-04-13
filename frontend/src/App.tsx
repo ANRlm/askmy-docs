@@ -9,6 +9,7 @@ import KeyboardShortcutsModal from './components/ui/KeyboardShortcutsModal'
 import { useCommandPalette } from './hooks/useCommandPalette'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useBreakpoint } from './hooks/useBreakpoint'
+import { useTheme } from './hooks/useTheme'
 import type { CommandItem } from './components/ui/CommandPalette'
 import type { KnowledgeBase, Session, Message, Source } from './types'
 import * as api from './api'
@@ -21,6 +22,7 @@ function AppInner() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const isMobile = useBreakpoint()
+  const { theme, toggleTheme } = useTheme()
   const [commandPaletteItems, setCommandPaletteItems] = useState<CommandItem[]>([])
   const [selectedKb, setSelectedKb] = useState<KnowledgeBase | null>(null)
   const [selectedSession, setSelectedSession] = useState<Session | null>(null)
@@ -403,6 +405,8 @@ function AppInner() {
         isMobile={isMobile}
         drawerOpen={drawerOpen}
         onCloseDrawer={() => setDrawerOpen(false)}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
       <main className="flex-1 flex overflow-hidden">
         <ChatArea
