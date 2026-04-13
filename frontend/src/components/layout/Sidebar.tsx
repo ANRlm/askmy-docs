@@ -42,7 +42,7 @@ export default function Sidebar({
   const [newKbDesc, setNewKbDesc] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
 
-const [renamingSessionId, setRenamingSessionId] = useState<number | null>(null)
+  const [renamingSessionId, setRenamingSessionId] = useState<number | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const renameInputRef = useRef<HTMLInputElement>(null)
 
