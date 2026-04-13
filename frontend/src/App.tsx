@@ -170,6 +170,8 @@ function AppInner() {
         stopRefs.current.delete(prev.id)
         setStreamingSessions((s) => { const n = new Set(s); n.delete(prev.id); return n })
       }
+      // Flush accumulated content synchronously before switching away
+      flushStreamingContent(prev.id)
       const tid = flushTimerRef.current.get(prev.id)
       if (tid) { clearTimeout(tid); flushTimerRef.current.delete(prev.id) }
       streamingAccumRef.current.delete(prev.id)

@@ -185,7 +185,7 @@ export default function DocumentModal({ kb, onClose }: Props) {
           let errMsg = `上传失败 (${xhr.status})`
           try {
             const err = JSON.parse(xhr.responseText)
-            errMsg = err.detail || errMsg
+            errMsg = err.detail || err.message || errMsg
           } catch {}
           if (mountedRef.current) {
             setUploadItems((prev) =>
@@ -207,7 +207,9 @@ export default function DocumentModal({ kb, onClose }: Props) {
 
       xhr.open('POST', '/api/kb/' + kb.id + '/documents')
       if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
-      xhr.send(file)
+      const formData = new FormData()
+      formData.append('file', file)
+      xhr.send(formData)
     })
   }, [kb.id])
 
