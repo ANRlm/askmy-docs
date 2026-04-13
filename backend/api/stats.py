@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from database import get_db
 from models.user import User
 from models.message import Message
-from models.feedback import Feedback, RetrievalLog
+from models.feedback import Feedback
 from models.session import Session
 from models.document import Document
 from middleware.auth import get_current_user
@@ -29,7 +29,9 @@ async def submit_feedback(
     await check_rate_limit(request, current_user.id)
 
     if body.rating not in (1, -1):
-        raise HTTPException(status_code=400, detail="rating 只能是 1（点赞）或 -1（踩）")
+        raise HTTPException(
+            status_code=400, detail="rating 只能是 1（点赞）或 -1（踩）"
+        )
 
     result = await db.execute(select(Message).where(Message.id == message_id))
     msg = result.scalar_one_or_none()
@@ -38,21 +40,27 @@ async def submit_feedback(
 
     # IDOR 校验：验证消息所属的会话属于当前用户
     result = await db.execute(
-        select(Session).where(Session.id == msg.session_id, Session.user_id == current_user.id)
+        select(Session).where(
+            Session.id == msg.session_id, Session.user_id == current_user.id
+        )
     )
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="消息不存在")
 
     # 检查是否已评价，若有则更新
     result = await db.execute(
-        select(Feedback).where(Feedback.message_id == message_id, Feedback.user_id == current_user.id)
+        select(Feedback).where(
+            Feedback.message_id == message_id, Feedback.user_id == current_user.id
+        )
     )
     existing = result.scalar_one_or_none()
 
     if existing:
         existing.rating = body.rating
     else:
-        feedback = Feedback(message_id=message_id, user_id=current_user.id, rating=body.rating)
+        feedback = Feedback(
+            message_id=message_id, user_id=current_user.id, rating=body.rating
+        )
         db.add(feedback)
 
     await db.commit()
@@ -70,7 +78,9 @@ async def get_stats(
 
     # 获取该 KB 的所有会话 ID
     result = await db.execute(
-        select(Session.id).where(Session.kb_id == kb_id, Session.user_id == current_user.id)
+        select(Session.id).where(
+            Session.kb_id == kb_id, Session.user_id == current_user.id
+        )
     )
     session_ids = [row[0] for row in result.all()]
 
@@ -153,7 +163,9 @@ async def get_message_sources(
 
     # IDOR 校验：验证消息所属的会话属于当前用户
     result = await db.execute(
-        select(Session).where(Session.id == msg.session_id, Session.user_id == current_user.id)
+        select(Session).where(
+            Session.id == msg.session_id, Session.user_id == current_user.id
+        )
     )
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="消息不存在")

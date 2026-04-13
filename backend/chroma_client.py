@@ -11,6 +11,13 @@ def get_collection(kb_id: int):
     )
 
 
+async def get_collection_async(kb_id: int):
+    def _get():
+        return get_collection(kb_id)
+
+    return await asyncio.to_thread(_get)
+
+
 def _sync_delete_collection(kb_id: int) -> None:
     client = get_chroma_client()
     collection_name = f"kb_{kb_id}"

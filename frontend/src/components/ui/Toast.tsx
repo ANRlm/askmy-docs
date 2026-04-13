@@ -138,6 +138,12 @@ function ToastItem({
   const toastRef = useRef<HTMLDivElement>(null)
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const startTimeRef = useRef<number>(Date.now())
+  const progressRef = useRef(100)
+
+  const updateProgress = (value: number) => {
+    progressRef.current = value
+    setProgress(value)
+  }
 
   // Start countdown on mount
   useEffect(() => {
@@ -145,7 +151,7 @@ function ToastItem({
     progressIntervalRef.current = setInterval(() => {
       const elapsed = Date.now() - startTimeRef.current
       const remaining = Math.max(0, DURATION - elapsed)
-      setProgress((remaining / DURATION) * 100)
+      updateProgress((remaining / DURATION) * 100)
     }, 50)
     return () => {
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current)
@@ -162,11 +168,11 @@ function ToastItem({
     }
     const handleMouseLeave = () => {
       if (!progressIntervalRef.current) {
-        startTimeRef.current = Date.now() - ((100 - progress) / 100) * DURATION
+        startTimeRef.current = Date.now() - ((100 - progressRef.current) / 100) * DURATION
         progressIntervalRef.current = setInterval(() => {
           const elapsed = Date.now() - startTimeRef.current
           const remaining = Math.max(0, DURATION - elapsed)
-          setProgress((remaining / DURATION) * 100)
+          updateProgress((remaining / DURATION) * 100)
         }, 50)
       }
     }
@@ -178,7 +184,7 @@ function ToastItem({
       el.removeEventListener('mouseenter', handleMouseEnter)
       el.removeEventListener('mouseleave', handleMouseLeave)
     }
-  }, [progress])
+  }, [])
 
   // Swipe to dismiss
   const handleTouchStart = (e: React.TouchEvent) => {

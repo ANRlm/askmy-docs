@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import {
-  Search, MessageSquare, FolderOpen, Plus, Trash2,
-  CornerDownLeft, ArrowRight, BookOpen, X, Hash,
+  Search, CornerDownLeft, ArrowRight, X,
 } from 'lucide-react'
 
 interface CommandItem {
@@ -170,7 +169,7 @@ export default function CommandPalette({ open, onClose, items, placeholder = 'æ
                 >
                   {categoryLabel[cat]}
                 </p>
-                {catItems.map((item, idx) => {
+                {catItems.map((item) => {
                   const globalIdx = filtered.indexOf(item)
                   return (
                     <button

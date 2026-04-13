@@ -11,12 +11,22 @@ from models.document import Document
 from middleware.auth import get_current_user
 from middleware.rate_limit import check_rate_limit
 from config import settings
-from chroma_client import get_collection, delete_collection
+from chroma_client import get_collection_async, delete_collection
 from loguru import logger
 
 router = APIRouter(tags=["文档管理"])
 
-ALLOWED_EXTENSIONS = {".pdf", ".md", ".txt", ".docx", ".xlsx", ".xls", ".csv", ".html", ".htm"}
+ALLOWED_EXTENSIONS = {
+    ".pdf",
+    ".md",
+    ".txt",
+    ".docx",
+    ".xlsx",
+    ".xls",
+    ".csv",
+    ".html",
+    ".htm",
+}
 MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB
 
 
@@ -28,6 +38,7 @@ def _write_file(path: str, content: bytes) -> None:
 def get_rq_queue():
     from rq import Queue
     from redis_client import sync_redis
+
     return Queue("document-processing", connection=sync_redis)
 
 
@@ -43,7 +54,9 @@ async def upload_document(
 
     # 验证知识库归属
     result = await db.execute(
-        select(KnowledgeBase).where(KnowledgeBase.id == kb_id, KnowledgeBase.user_id == current_user.id)
+        select(KnowledgeBase).where(
+            KnowledgeBase.id == kb_id, KnowledgeBase.user_id == current_user.id
+        )
     )
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="知识库不存在")
@@ -51,12 +64,18 @@ async def upload_document(
     # 验证文件类型
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=400, detail=f"不支持的文件类型，仅支持: {', '.join(sorted(ALLOWED_EXTENSIONS))}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的文件类型，仅支持: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+        )
 
     # 读取内容并检查大小
     content = await file.read()
     if len(content) > MAX_FILE_SIZE_BYTES:
-        raise HTTPException(status_code=413, detail=f"文件大小超过 {MAX_FILE_SIZE_BYTES // (1024*1024)} MB 限制")
+        raise HTTPException(
+            status_code=413,
+            detail=f"文件大小超过 {MAX_FILE_SIZE_BYTES // (1024 * 1024)} MB 限制",
+        )
 
     # 存储文件
     os.makedirs(settings.file_storage_path, exist_ok=True)
@@ -111,7 +130,9 @@ async def list_documents(
     await check_rate_limit(request, current_user.id)
 
     result = await db.execute(
-        select(KnowledgeBase).where(KnowledgeBase.id == kb_id, KnowledgeBase.user_id == current_user.id)
+        select(KnowledgeBase).where(
+            KnowledgeBase.id == kb_id, KnowledgeBase.user_id == current_user.id
+        )
     )
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="知识库不存在")
@@ -241,7 +262,7 @@ async def delete_document(
 
     # 删除 Chroma 中的向量
     try:
-        collection = get_collection(kb_id)
+        collection = await get_collection_async(kb_id)
         await asyncio.to_thread(collection.delete, where={"document_id": str(doc_id)})
     except Exception as e:
         logger.warning(f"删除 Chroma 向量失败: {e}")

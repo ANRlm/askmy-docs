@@ -1,6 +1,7 @@
 """
 文档异步处理任务（RQ Worker 执行）
 """
+
 import asyncio
 from weakref import WeakValueDictionary
 from loguru import logger
@@ -11,9 +12,16 @@ _engines: WeakValueDictionary[str, object] = WeakValueDictionary()
 
 def _get_engine():
     """Get or create a process-level async engine for the current DATABASE_URL."""
-    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+    from sqlalchemy.ext.asyncio import (
+        create_async_engine,
+        AsyncSession,
+        async_sessionmaker,
+    )
     from config import settings
-    DATABASE_URL = settings.database_url.replace("postgresql://", "postgresql+asyncpg://")
+
+    DATABASE_URL = settings.database_url.replace(
+        "postgresql://", "postgresql+asyncpg://"
+    )
     engine = _engines.get(DATABASE_URL)
     if engine is None:
         engine = create_async_engine(DATABASE_URL, pool_size=10, max_overflow=20)
@@ -23,6 +31,7 @@ def _get_engine():
 
 def _get_session_maker(engine):
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
     return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
@@ -39,14 +48,16 @@ async def _process_document_async(document_id: int):
     from models.user import User  # noqa: F401
     from services.document_service import extract_text_from_file, split_into_chunks
     from services.embedding_service import get_embeddings
-    from chroma_client import get_collection
+    from chroma_client import get_collection_async
 
     engine = _get_engine()
     SessionLocal = _get_session_maker(engine)
 
     async with SessionLocal() as db:
         try:
-            result = await db.execute(select(Document).where(Document.id == document_id))
+            result = await db.execute(
+                select(Document).where(Document.id == document_id)
+            )
             doc = result.scalar_one_or_none()
             if not doc:
                 logger.error(f"文档 {document_id} 不存在")
@@ -74,12 +85,12 @@ async def _process_document_async(document_id: int):
             batch_size = 10
             all_embeddings = []
             for i in range(0, len(chunks), batch_size):
-                batch = chunks[i:i + batch_size]
+                batch = chunks[i : i + batch_size]
                 embeddings = await get_embeddings(batch)
                 all_embeddings.extend(embeddings)
 
             # 写入 Chroma
-            collection = get_collection(doc.kb_id)
+            collection = await get_collection_async(doc.kb_id)
             ids = [f"doc_{document_id}_chunk_{i}" for i in range(len(chunks))]
             metadatas = [
                 {
@@ -92,15 +103,19 @@ async def _process_document_async(document_id: int):
 
             # 先删除该文档已有的向量（重新上传时清理）
             try:
-                collection.delete(where={"document_id": str(document_id)})
+                await asyncio.to_thread(
+                    collection.delete, where={"document_id": str(document_id)}
+                )
             except Exception:
                 pass
 
-            collection.add(
-                ids=ids,
-                embeddings=all_embeddings,
-                documents=chunks,
-                metadatas=metadatas,
+            await asyncio.to_thread(
+                lambda: collection.add(
+                    ids=ids,
+                    embeddings=all_embeddings,
+                    documents=chunks,
+                    metadatas=metadatas,
+                )
             )
 
             # 更新文档状态
@@ -112,7 +127,9 @@ async def _process_document_async(document_id: int):
         except Exception as e:
             logger.error("文档 {} 处理失败: {}", document_id, e, exc_info=True)
             try:
-                result = await db.execute(select(Document).where(Document.id == document_id))
+                result = await db.execute(
+                    select(Document).where(Document.id == document_id)
+                )
                 doc = result.scalar_one_or_none()
                 if doc:
                     doc.status = "failed"

@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { X, Upload, Trash2, FileText, RefreshCw, CheckCircle, AlertCircle, Clock, File, FileBadge } from 'lucide-react'
+import { X, Upload, Trash2, FileText, RefreshCw, CheckCircle, AlertCircle, Clock, File } from 'lucide-react'
 import * as api from '../../api'
 import type { Document, KnowledgeBase } from '../../types'
-import { useToast } from '../ui/Toast'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
 
 interface Props {
@@ -94,7 +93,6 @@ function SkeletonDocRow() {
 }
 
 export default function DocumentModal({ kb, onClose }: Props) {
-  const { toast } = useToast()
   const [docs, setDocs] = useState<Document[]>([])
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')

@@ -15,5 +15,15 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'markdown-vendor': ['react-markdown', 'remark-gfm', 'rehype-highlight', 'react-syntax-highlighter'],
+          'ui-vendor': ['lucide-react', 'clsx'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 600,
   },
 })

@@ -8,7 +8,7 @@
 
 | 层级 | 选型 |
 |---|---|
-| 前端 | React 18 + TypeScript + Vite + Tailwind CSS |
+| 前端 | React 19 + TypeScript + Vite + Tailwind CSS |
 | 后端框架 | Python + FastAPI |
 | 数据库 | PostgreSQL 15 |
 | 向量数据库 | Chroma 1.0 |

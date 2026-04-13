@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import {
   Plus, Trash2, FolderOpen, MessageSquare, ChevronDown, ChevronRight,
-  BookOpen, LogOut, Settings, Search, X, Files, Sliders,
+  BookOpen, LogOut, Search, X, Files, Sliders,
 } from 'lucide-react'
 import * as api from '../../api'
 import type { KnowledgeBase, Session } from '../../types'

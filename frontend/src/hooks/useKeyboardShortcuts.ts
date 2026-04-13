@@ -17,9 +17,6 @@ export function useKeyboardShortcuts(shortcuts: Shortcut[], enabled = true) {
     const isEditing = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
 
     for (const shortcut of shortcuts) {
-      const matchMeta = shortcut.metaKey ? (e.metaKey || e.ctrlKey) : true
-      const matchCtrl = shortcut.ctrlKey ? e.ctrlKey : true
-      const matchShift = shortcut.shiftKey ? e.shiftKey : !e.shiftKey
       const matchKey = e.key.toLowerCase() === shortcut.key.toLowerCase()
 
       // Escape always fires, other keys skip when editing

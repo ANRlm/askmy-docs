@@ -1,5 +1,5 @@
 import React from 'react'
-import { Copy, CheckCheck, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
+import { Copy, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
 
 interface State {
   hasError: boolean

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { X, Settings2, Database, Zap } from 'lucide-react'
 import * as api from '../../api'
 import type { KnowledgeBase } from '../../types'

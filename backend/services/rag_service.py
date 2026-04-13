@@ -3,7 +3,7 @@ import hashlib
 import json
 from typing import AsyncGenerator
 
-from chroma_client import get_collection
+from chroma_client import get_collection_async
 from redis_client import redis_client
 from services.embedding_service import get_embedding
 from services.llm_service import chat_completion_stream
@@ -27,28 +27,37 @@ KEEP_RECENT_ROUNDS = 3
 
 def _make_context_hash(chunks: list[dict]) -> str:
     """Hash of retrieved chunk IDs + texts for cache key."""
-    key_parts = [f"{c.get('document_id', '')}:{c.get('chunk_index', 0)}:{c.get('text', '')[:50]}" for c in chunks]
+    key_parts = [
+        f"{c.get('document_id', '')}:{c.get('chunk_index', 0)}:{c.get('text', '')[:50]}"
+        for c in chunks
+    ]
     return hashlib.sha256("|".join(key_parts).encode()).hexdigest()[:16]
 
 
-def _make_history_hash(history_messages: list[dict], session_summary: str | None) -> str:
+def _make_history_hash(
+    history_messages: list[dict], session_summary: str | None
+) -> str:
     """Hash of conversation history — same Q in different contexts should not share cache."""
     parts = []
     if session_summary:
         parts.append(f"summary:{session_summary[:100]}")
     # Include last 2 rounds of history to differentiate context
     for m in history_messages[-4:]:
-        parts.append(f"{m.get('role','')}:{m.get('content','')[:80]}")
+        parts.append(f"{m.get('role', '')}:{m.get('content', '')[:80]}")
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:16]
 
 
-def _make_cache_key(kb_id: int, question: str, context_hash: str, history_hash: str) -> str:
+def _make_cache_key(
+    kb_id: int, question: str, context_hash: str, history_hash: str
+) -> str:
     """Build Redis key: rag_cache:{kb_id}:{history_hash}:{context_hash}:{question_hash}"""
     question_hash = hashlib.sha256(question.encode()).hexdigest()[:24]
     return f"{_CACHE_KEY_PREFIX}:{kb_id}:{history_hash}:{context_hash}:{question_hash}"
 
 
-async def _cache_get(kb_id: int, question: str, context_hash: str, history_hash: str) -> tuple[str, list[dict]] | None:
+async def _cache_get(
+    kb_id: int, question: str, context_hash: str, history_hash: str
+) -> tuple[str, list[dict]] | None:
     key = _make_cache_key(kb_id, question, context_hash, history_hash)
     data = await redis_client.get(key)
     if data:
@@ -59,16 +68,25 @@ async def _cache_get(kb_id: int, question: str, context_hash: str, history_hash:
     return None
 
 
-async def _cache_set(kb_id: int, question: str, context_hash: str, history_hash: str, response: str, sources: list[dict]) -> None:
+async def _cache_set(
+    kb_id: int,
+    question: str,
+    context_hash: str,
+    history_hash: str,
+    response: str,
+    sources: list[dict],
+) -> None:
     key = _make_cache_key(kb_id, question, context_hash, history_hash)
     data = json.dumps({"response": response, "sources": sources})
     await redis_client.setex(key, _CACHE_TTL_SECONDS, data)
 
 
-async def retrieve_chunks(kb_id: int, query: str, top_k: int = 5, score_threshold: float = 0.5) -> list[dict]:
+async def retrieve_chunks(
+    kb_id: int, query: str, top_k: int = 5, score_threshold: float = 0.5
+) -> list[dict]:
     """从 Chroma 检索最相关的文本片段（运行在受限线程池避免阻塞事件循环）"""
     query_embedding = await get_embedding(query)
-    collection = get_collection(kb_id)
+    collection = await get_collection_async(kb_id)
 
     def _query():
         return collection.query(
@@ -89,16 +107,20 @@ async def retrieve_chunks(kb_id: int, query: str, top_k: int = 5, score_threshol
             score = 1 - dist  # cosine distance -> similarity
             if score < score_threshold:
                 continue
-            chunks.append({
-                "text": doc,
-                "filename": meta.get("filename", "未知文件"),
-                "chunk_index": meta.get("chunk_index", 0),
-                "document_id": meta.get("document_id"),
-                "score": score,
-            })
+            chunks.append(
+                {
+                    "text": doc,
+                    "filename": meta.get("filename", "未知文件"),
+                    "chunk_index": meta.get("chunk_index", 0),
+                    "document_id": meta.get("document_id"),
+                    "score": score,
+                }
+            )
 
     if not chunks:
-        logger.warning(f"No chunks retrieved for kb={kb_id}, query={query!r}, top_k={top_k}, score_threshold={score_threshold}")
+        logger.warning(
+            f"No chunks retrieved for kb={kb_id}, query={query!r}, top_k={top_k}, score_threshold={score_threshold}"
+        )
         # Log top scores even when below threshold
         if results and results["distances"]:
             top_scores = [1 - d for d in results["distances"][0][:3]]
@@ -124,40 +146,50 @@ async def rag_chat_stream(
     messages_for_llm = []
 
     if session_summary:
-        messages_for_llm.append({
-            "role": "system",
-            "content": f"以下是之前对话的摘要：\n{session_summary}",
-        })
+        messages_for_llm.append(
+            {
+                "role": "system",
+                "content": f"以下是之前对话的摘要：\n{session_summary}",
+            }
+        )
 
     # 只保留最近 KEEP_RECENT_ROUNDS 轮原文
-    recent = history_messages[-(KEEP_RECENT_ROUNDS * 2):]
+    recent = history_messages[-(KEEP_RECENT_ROUNDS * 2) :]
     messages_for_llm.extend(recent)
 
     # 检索
-    chunks = await retrieve_chunks(kb_id, user_question, top_k=top_k, score_threshold=score_threshold)
+    chunks = await retrieve_chunks(
+        kb_id, user_question, top_k=top_k, score_threshold=score_threshold
+    )
 
     context_parts = []
     sources = []
     for i, chunk in enumerate(chunks):
         context_parts.append(
-            f"[来源：{chunk['filename']}，第{chunk['chunk_index']+1}段]\n{chunk['text']}"
+            f"[来源：{chunk['filename']}，第{chunk['chunk_index'] + 1}段]\n{chunk['text']}"
         )
-        sources.append({
-            "filename": chunk["filename"],
-            "chunk_index": chunk["chunk_index"],
-            "text": chunk["text"],
-            "score": chunk["score"],
-            "document_id": chunk.get("document_id"),
-        })
+        sources.append(
+            {
+                "filename": chunk["filename"],
+                "chunk_index": chunk["chunk_index"],
+                "text": chunk["text"],
+                "score": chunk["score"],
+                "document_id": chunk.get("document_id"),
+            }
+        )
 
-    context = "\n\n---\n\n".join(context_parts) if context_parts else "（暂无相关参考资料）"
+    context = (
+        "\n\n---\n\n".join(context_parts) if context_parts else "（暂无相关参考资料）"
+    )
 
     # Short-circuit: no relevant chunks — return canned response without calling LLM
     if not chunks:
-        logger.warning(f"RAG short-circuit: no relevant chunks for kb={kb_id}, query={user_question!r}")
+        logger.warning(
+            f"RAG short-circuit: no relevant chunks for kb={kb_id}, query={user_question!r}"
+        )
         no_result = "抱歉，知识库中没有找到与您问题相关的内容，建议您尝试换一种表述方式，或上传更多相关文档。"
         for i in range(0, len(no_result), 50):
-            yield no_result[i:i+50], []
+            yield no_result[i : i + 50], []
         yield "", []
         return
 
@@ -171,11 +203,14 @@ async def rag_chat_stream(
         logger.debug(f"Cache hit for kb={kb_id} question={user_question[:30]}")
         cached_response, cached_sources = cached
         for i in range(0, len(cached_response), 50):
-            yield cached_response[i:i+50], []
+            yield cached_response[i : i + 50], []
         yield "", cached_sources
         return
 
-    system_message = {"role": "system", "content": SYSTEM_PROMPT.format(context=context)}
+    system_message = {
+        "role": "system",
+        "content": SYSTEM_PROMPT.format(context=context),
+    }
     user_message = {"role": "user", "content": user_question}
 
     final_messages = [system_message] + messages_for_llm + [user_message]
@@ -190,7 +225,9 @@ async def rag_chat_stream(
 
     # Cache the complete response
     final_response = "".join(full_response)
-    await _cache_set(kb_id, user_question, context_hash, history_hash, final_response, sources)
+    await _cache_set(
+        kb_id, user_question, context_hash, history_hash, final_response, sources
+    )
 
     # 最后 yield sources
     yield "", sources
@@ -207,7 +244,7 @@ async def get_new_summary(
     old_messages: list[dict],
 ) -> str:
     """生成新摘要（保留最近 3 轮外的消息）"""
-    messages_to_summarize = old_messages[:-(KEEP_RECENT_ROUNDS * 2)]
+    messages_to_summarize = old_messages[: -(KEEP_RECENT_ROUNDS * 2)]
     if not messages_to_summarize:
         return existing_summary or ""
 
