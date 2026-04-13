@@ -117,7 +117,8 @@ export async function renameSession(sessionId: number, title: string): Promise<S
 export async function getMessages(sessionId: number): Promise<Array<{
   id: number; role: string; content: string; sources: Source[] | null; created_at: string
 }>> {
-  return request(`/sessions/${sessionId}/messages`)
+  const data = await request<{ messages: Array<{ id: number; role: string; content: string; sources: Source[] | null; created_at: string }>; next_cursor: number | null; has_more: boolean }>(`/sessions/${sessionId}/messages`)
+  return data.messages
 }
 
 // Chat stream
