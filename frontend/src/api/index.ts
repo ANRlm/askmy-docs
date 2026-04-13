@@ -106,6 +106,10 @@ export async function deleteSession(sessionId: number): Promise<void> {
   return request(`/sessions/${sessionId}`, { method: 'DELETE' })
 }
 
+export async function shareSession(sessionId: number): Promise<{ share_url: string }> {
+  return request(`/sessions/${sessionId}/share`, { method: 'POST' })
+}
+
 export async function renameSession(sessionId: number, title: string): Promise<Session> {
   return request(`/sessions/${sessionId}`, { method: 'PATCH', body: JSON.stringify({ title }) })
 }
@@ -227,6 +231,10 @@ export async function submitFeedback(messageId: number, rating: 1 | -1): Promise
     method: 'POST',
     body: JSON.stringify({ rating }),
   })
+}
+
+export async function deleteMessage(messageId: number): Promise<void> {
+  return request(`/messages/${messageId}`, { method: 'DELETE' })
 }
 
 export async function stt(audioBlob: Blob, ext: string): Promise<{ text: string }> {

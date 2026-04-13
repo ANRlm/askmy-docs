@@ -6,7 +6,7 @@ import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import {
   Mic, MicOff, Volume2, VolumeX, ChevronDown, ChevronRight,
   FileText, Square, ArrowUp, Loader2, ThumbsUp, ThumbsDown,
-  Pencil, X, Search, Download, RotateCcw, Copy, CheckCheck, Clock, Menu,
+  Pencil, X, Search, Download, RotateCcw, Copy, CheckCheck, Clock, Menu, Trash2, Share2,
 } from 'lucide-react'
 import type { Message, Session, KnowledgeBase, Source } from '../../types'
 import * as api from '../../api'
@@ -65,6 +65,7 @@ interface Props {
   onSend: (text: string) => void
   onStop: () => void
   onRetrace: (targetDbId: number, newContent: string) => void
+  onDelete?: (msgId: string) => void
   isMobile?: boolean
   onOpenDrawer?: () => void
 }
@@ -470,9 +471,10 @@ function UserBubble({ msg, isStreaming, onRetrace, onRequestCancel, highlightFn,
 }
 
 /* ── AI message bubble ── */
-function AssistantBubble({ msg, onRetry, highlightFn, searchQuery }: { msg: Message; onRetry?: (text: string) => void; highlightFn?: (text: string, query: string) => React.ReactNode; searchQuery?: string }) {
+function AssistantBubble({ msg, onRetry, onDelete, highlightFn, searchQuery }: { msg: Message; onRetry?: (text: string) => void; onDelete?: (msgId: string) => void; highlightFn?: (text: string, query: string) => React.ReactNode; searchQuery?: string }) {
   const [hovered, setHovered] = useState(false)
   const isError = msg.content.startsWith('错误:')
+  const { toast } = useToast()
 
   return (
     <div
@@ -555,6 +557,24 @@ function AssistantBubble({ msg, onRetry, highlightFn, searchQuery }: { msg: Mess
               <CopyButton text={msg.content} />
               {!isError && <TtsButton text={msg.content} />}
               {msg.db_id && !isError && <FeedbackButtons dbId={msg.db_id} />}
+              {msg.db_id && onDelete && (
+                <button
+                  onClick={async () => {
+                    try {
+                      await api.deleteMessage(msg.db_id!)
+                      onDelete?.(msg.id)
+                    } catch {
+                      toast('删除失败', 'error')
+                    }
+                  }}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] interactive"
+                  style={{ color: 'var(--text-disabled)' }}
+                  title="删除消息"
+                  aria-label="删除消息"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              )}
             </>
           )}
         </div>
@@ -603,7 +623,7 @@ function MarkdownPreview({ text }: { text: string }) {
 
 const MAX_CHARS = 2000
 
-export default function ChatArea({ kb, session, messages, isStreaming, isLoadingMessages, onSend, onStop, onRetrace, isMobile, onOpenDrawer }: Props) {
+export default function ChatArea({ kb, session, messages, isStreaming, isLoadingMessages, onSend, onStop, onRetrace, onDelete, isMobile, onOpenDrawer }: Props) {
   const [input, setInput] = useState('')
   const [sttLoading, setSttLoading] = useState(false)
   const [sttError, setSttError] = useState<string | null>(null)
@@ -803,6 +823,24 @@ export default function ChatArea({ kb, session, messages, isStreaming, isLoading
           >
             {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
           </button>
+          <button
+            onClick={async () => {
+              if (!session) return
+              try {
+                const data = await api.shareSession(session.id)
+                await navigator.clipboard.writeText(window.location.origin + data.share_url)
+                toast('分享链接已复制到剪贴板', 'success')
+              } catch {
+                toast('分享失败', 'error')
+              }
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] interactive"
+            style={{ color: 'var(--text-tertiary)' }}
+            title="分享会话"
+            aria-label="分享会话"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 
@@ -883,7 +921,16 @@ export default function ChatArea({ kb, session, messages, isStreaming, isLoading
               searchQuery={searchQuery}
             />
           ) : (
-            <AssistantBubble key={msg.id} msg={msg} onRetry={onSend} highlightFn={highlightText} searchQuery={searchQuery} />
+            <AssistantBubble
+              key={msg.id}
+              msg={msg}
+              onRetry={onSend}
+              onDelete={(msgId) => {
+                onDelete?.(msgId)
+              }}
+              highlightFn={highlightText}
+              searchQuery={searchQuery}
+            />
           )
         )}
 <div ref={bottomRef} />
