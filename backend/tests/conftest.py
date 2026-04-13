@@ -2,7 +2,7 @@ import pytest
 import asyncio
 import os
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, AsyncMock, patch
 
 os.environ["JWT_SECRET"] = "test-secret-key-not-insecure-list"
 os.environ["DATABASE_URL"] = "postgresql://test:test@localhost/test"
@@ -18,14 +18,9 @@ sys.modules["loguru"].logger = mock_logger
 
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.pool import StaticPool
 
-
-class Base(DeclarativeBase):
-    pass
-
-
+from database import Base
 from utils.security import hash_password
 
 
@@ -38,7 +33,14 @@ def event_loop():
 
 @pytest.fixture
 async def db_session():
-    from models.user import User
+    import models.user  # noqa
+    import models.knowledge_base  # noqa
+    import models.document  # noqa
+    import models.session  # noqa
+    import models.message  # noqa
+    import models.feedback  # noqa
+    import models.password_reset  # noqa
+    import models.api_key  # noqa
 
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
@@ -69,10 +71,14 @@ async def client(db_session):
 
     app.dependency_overrides[get_db] = override_get_db
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
-        yield ac
+    with (
+        patch("api.auth.check_ip_rate_limit", new=AsyncMock()),
+        patch("api.auth.check_rate_limit", new=AsyncMock()),
+    ):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
+            yield ac
 
     app.dependency_overrides.clear()
 
@@ -84,6 +90,7 @@ async def test_user(db_session):
     user = User(
         email="test@example.com",
         hashed_password=hash_password("testpassword"),
+        is_verified=True,
     )
     db_session.add(user)
     await db_session.commit()

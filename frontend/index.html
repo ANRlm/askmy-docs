@@ -5,6 +5,18 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AskMyDocs - AI 知识问答</title>
+    <script>
+      (function() {
+        var pref = localStorage.getItem('theme');
+        var theme;
+        if (pref === 'dark' || pref === 'light') {
+          theme = pref;
+        } else {
+          theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

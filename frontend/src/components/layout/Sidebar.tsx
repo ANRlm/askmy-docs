@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   Plus, Trash2, FolderOpen, MessageSquare, ChevronDown, ChevronRight,
-  BookOpen, LogOut, Search, X, Files, Sliders, Sun, Moon,
+  BookOpen, LogOut, Search, X, Files, Sliders, Sun, Moon, Monitor,
 } from 'lucide-react'
 import * as api from '../../api'
 import type { KnowledgeBase, Session } from '../../types'
@@ -9,6 +9,7 @@ import { useAuth } from '../../hooks/useAuth'
 import DocumentModal from '../kb/DocumentModal'
 import KbSettingsModal from '../kb/KbSettingsModal'
 import ConfirmDialog from '../ui/ConfirmDialog'
+import type { ThemePref } from '../../hooks/useTheme'
 
 interface Props {
   selectedKb: KnowledgeBase | null
@@ -24,14 +25,14 @@ interface Props {
   isMobile?: boolean
   drawerOpen?: boolean
   onCloseDrawer?: () => void
-  theme?: 'dark' | 'light'
+  theme?: ThemePref
   onToggleTheme?: () => void
 }
 
 export default function Sidebar({
   selectedKb, selectedSession, collapsed, onToggleCollapse,
   onSelectKb, onSelectSession, onNewSession, onSessionRenamed, onKbDeleted, onKbUpdated,
-  isMobile, drawerOpen, onCloseDrawer, theme = 'dark', onToggleTheme,
+  isMobile, drawerOpen, onCloseDrawer, theme = 'system', onToggleTheme,
 }: Props) {
   const { user, logout } = useAuth()
   const [kbs, setKbs] = useState<KnowledgeBase[]>([])
@@ -510,13 +511,13 @@ export default function Sidebar({
               className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
               style={{ background: 'var(--bg-active)', border: '1px solid var(--border-strong)', color: 'var(--text-secondary)' }}
             >
-              {theme === 'dark' ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3" />}
+              {theme === 'dark' ? <Moon className="w-3 h-3" /> : theme === 'light' ? <Sun className="w-3 h-3" /> : <Monitor className="w-3 h-3" />}
             </div>
             <span
               className="flex-1 text-[12px] truncate font-medium"
               style={{ color: 'var(--text-tertiary)', transition: 'color 0.15s' }}
             >
-              {theme === 'dark' ? '浅色模式' : '深色模式'}
+              {theme === 'dark' ? '深色模式' : theme === 'light' ? '浅色模式' : '跟随系统'}
             </span>
           </button>
           <div

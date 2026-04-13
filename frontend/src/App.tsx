@@ -22,7 +22,7 @@ function AppInner() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const isMobile = useBreakpoint()
-  const { theme, toggleTheme } = useTheme()
+  const { pref, toggleTheme } = useTheme()
   const [commandPaletteItems, setCommandPaletteItems] = useState<CommandItem[]>([])
   const [selectedKb, setSelectedKb] = useState<KnowledgeBase | null>(null)
   const [selectedSession, setSelectedSession] = useState<Session | null>(null)
@@ -405,7 +405,7 @@ function AppInner() {
         isMobile={isMobile}
         drawerOpen={drawerOpen}
         onCloseDrawer={() => setDrawerOpen(false)}
-        theme={theme}
+        theme={pref}
         onToggleTheme={toggleTheme}
       />
       <main className="flex-1 flex overflow-hidden">

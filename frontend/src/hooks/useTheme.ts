@@ -1,22 +1,45 @@
 import { useState, useEffect, useCallback } from 'react'
 
+export type ThemePref = 'system' | 'dark' | 'light'
 type Theme = 'dark' | 'light'
 
+function getSystemTheme(): Theme {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
 export function useTheme() {
-  const [theme, setTheme] = useState<Theme>(() => {
-    const stored = localStorage.getItem('theme') as Theme | null
-    if (stored) return stored
-    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+  const [pref, setPref] = useState<ThemePref>(() => {
+    const stored = localStorage.getItem('theme')
+    if (stored === 'dark' || stored === 'light' || stored === 'system') return stored
+    return 'system'
   })
 
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem('theme', theme)
-  }, [theme])
+  const [systemTheme, setSystemTheme] = useState<Theme>(getSystemTheme)
 
-  const toggleTheme = useCallback(() => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const handler = (e: MediaQueryListEvent) => setSystemTheme(e.matches ? 'dark' : 'light')
+    mq.addListener(handler)
+    return () => mq.removeListener(handler)
   }, [])
 
-  return { theme, toggleTheme, isDark: theme === 'dark' }
+  const effectiveTheme: Theme = pref === 'system' ? systemTheme : pref
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', effectiveTheme)
+  }, [effectiveTheme])
+
+  useEffect(() => {
+    localStorage.setItem('theme', pref)
+  }, [pref])
+
+  const toggleTheme = useCallback(() => {
+    setPref((prev) => {
+      if (prev === 'system') return 'dark'
+      if (prev === 'dark') return 'light'
+      return 'system'
+    })
+  }, [])
+
+  return { theme: effectiveTheme, pref, toggleTheme }
 }

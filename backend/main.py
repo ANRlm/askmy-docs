@@ -19,7 +19,13 @@ from middleware.request_id import RequestIDMiddleware
 
 setup_logger()
 
-_INSECURE_SECRETS = {"changeme", "change-me", "change-me-use-openssl-rand-hex-32", "secret", ""}
+_INSECURE_SECRETS = {
+    "changeme",
+    "change-me",
+    "change-me-use-openssl-rand-hex-32",
+    "secret",
+    "",
+}
 
 
 @asynccontextmanager
@@ -32,7 +38,9 @@ async def lifespan(app: FastAPI):
             "JWT_SECRET 使用了不安全的默认值，强制退出。"
             " 请在 .env 中设置随机密钥：openssl rand -hex 32"
         )
-        raise RuntimeError("jwt_secret 使用了不安全的默认值，必须在 .env 中设置随机密钥")
+        raise RuntimeError(
+            "jwt_secret 使用了不安全的默认值，必须在 .env 中设置随机密钥"
+        )
 
     init_clients()
     logger.info("外部服务客户端初始化完成")
@@ -89,7 +97,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
-        content={"code": exc.status_code, "message": exc.detail, "detail": None},
+        content={"code": exc.status_code, "detail": exc.detail},
     )
 
 

@@ -66,9 +66,14 @@
   --shadow-glow:    none;
 }
 
+/* ── Dark mode — explicit dark theme overrides ── */
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
 /* ── Light mode — clean white surfaces ── */
-:root,
 [data-theme="light"] {
+  color-scheme: light;
   --bg-base:        #ffffff;
   --bg-panel:       #fafafa;
   --bg-sidebar:     #f5f5f5;
