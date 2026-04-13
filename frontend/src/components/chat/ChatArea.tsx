@@ -86,32 +86,6 @@ function SkeletonMessageRow({ role }: { role: 'user' | 'assistant' }) {
   )
 }
 
-/* ── Typing indicator ── */
-function TypingIndicator() {
-  return (
-    <div className="flex gap-3 animate-fade-in">
-      <div className="ai-orb w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-        <span className="text-[9px] font-medium">AI</span>
-      </div>
-      <div
-        className="px-4 py-3 rounded-2xl rounded-tl-md"
-        style={{ background: 'var(--bg-hover)', border: '1px solid var(--border)' }}
-      >
-        <div className="flex items-center gap-1">
-          {[0, 1, 2].map((i) => (
-            <span
-              key={i}
-              className="w-1.5 h-1.5 rounded-full inline-block animate-pulse-dot"
-              style={{ background: 'var(--text-tertiary)', animationDelay: `${i * 0.18}s` }}
-            />
-          ))}
-          <span className="text-[11px] ml-1" style={{ color: 'var(--text-tertiary)' }}>正在思考...</span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 /* ── Relative time ── */
 function relativeTime(isoString: string): string {
   const now = Date.now()
@@ -175,6 +149,7 @@ function TtsButton({ text }: { text: string }) {
   const [loading, setLoading] = useState(false)
   const [playing, setPlaying] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const { toast } = useToast()
 
   const toggle = async () => {
     if (playing && audioRef.current) {
@@ -188,7 +163,9 @@ function TtsButton({ text }: { text: string }) {
       audioRef.current = audio
       audio.onended = () => { setPlaying(false); URL.revokeObjectURL(url) }
       audio.play(); setPlaying(true)
-    } catch {}
+    } catch {
+      toast('语音播放失败', 'error')
+    }
     setLoading(false)
   }
 
@@ -215,13 +192,16 @@ function TtsButton({ text }: { text: string }) {
 /* ── Feedback buttons ── */
 function FeedbackButtons({ dbId }: { dbId: number }) {
   const [voted, setVoted] = useState<1 | -1 | null>(null)
+  const { toast } = useToast()
 
   const handleVote = async (rating: 1 | -1) => {
     if (voted !== null) return
     try {
       await api.submitFeedback(dbId, rating)
       setVoted(rating)
-    } catch {}
+    } catch {
+      toast('反馈提交失败', 'error')
+    }
   }
 
   return (
@@ -257,7 +237,9 @@ function CopyButton({ text }: { text: string }) {
       setCopied(true)
       toast('已复制到剪贴板', 'success')
       setTimeout(() => setCopied(false), 2000)
-    } catch {}
+    } catch {
+      toast('复制失败', 'error')
+    }
   }
 
   return (
@@ -276,13 +258,16 @@ function CopyButton({ text }: { text: string }) {
 /* ── Code block with copy ── */
 function CodeBlock({ language, code }: { language?: string; code: string }) {
   const [codeCopied, setCodeCopied] = useState(false)
+  const { toast } = useToast()
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(code)
       setCodeCopied(true)
       setTimeout(() => setCodeCopied(false), 2000)
-    } catch {}
+    } catch {
+      toast('复制失败', 'error')
+    }
   }
 
   return (
@@ -751,10 +736,7 @@ export default function ChatArea({ kb, session, messages, isStreaming, isLoading
             <AssistantBubble key={msg.id} msg={msg} onRetry={onSend} />
           )
         )}
-        {isStreaming && messages.filter(m => m.role === 'assistant').every(m => !m.content) && (
-          <TypingIndicator />
-        )}
-        <div ref={bottomRef} />
+<div ref={bottomRef} />
       </div>
 
       {/* Input area */}
