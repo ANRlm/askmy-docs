@@ -2,6 +2,7 @@ import os
 import uuid
 import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from database import get_db
@@ -276,3 +277,82 @@ async def delete_document(
     await db.delete(doc)
     await db.commit()
     return {"message": "文档已删除"}
+
+
+class SearchChunk(BaseModel):
+    document_id: int
+    chunk_index: int
+    text: str
+    filename: str
+
+
+class SearchRequest(BaseModel):
+    query: str
+    limit: int = 20
+
+
+@router.post("/api/kb/{kb_id}/documents/search", summary="搜索文档内容")
+async def search_documents(
+    kb_id: int,
+    body: SearchRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await check_rate_limit(request, current_user.id)
+
+    result = await db.execute(
+        select(KnowledgeBase).where(
+            KnowledgeBase.id == kb_id, KnowledgeBase.user_id == current_user.id
+        )
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="知识库不存在")
+
+    try:
+        collection = await get_collection_async(kb_id)
+        query_lower = body.query.lower()
+
+        results = await asyncio.to_thread(
+            collection.get,
+            include=["documents", "metadatas"],
+        )
+
+        matches: list[SearchChunk] = []
+        for i, doc_text in enumerate(results.get("documents", [])):
+            if doc_text and query_lower in doc_text.lower():
+                meta = (
+                    results.get("metadatas", [])[i]
+                    if i < len(results.get("metadatas", []))
+                    else {}
+                )
+                doc_id = int(meta.get("document_id", 0))
+                chunk_idx = int(meta.get("chunk_index", 0))
+                filename = meta.get("filename", "unknown")
+
+                doc_result = await db.execute(
+                    select(Document.filename).where(
+                        Document.id == doc_id, Document.kb_id == kb_id
+                    )
+                )
+                row = doc_result.scalar_one_or_none()
+                if row:
+                    filename = row
+
+                matches.append(
+                    SearchChunk(
+                        document_id=doc_id,
+                        chunk_index=chunk_idx,
+                        text=doc_text[:500],
+                        filename=filename,
+                    )
+                )
+
+                if len(matches) >= body.limit:
+                    break
+
+        return {"results": [m.model_dump() for m in matches]}
+
+    except Exception as e:
+        logger.error(f"文档搜索失败: {e}")
+        raise HTTPException(status_code=500, detail="搜索失败")

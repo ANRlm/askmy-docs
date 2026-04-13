@@ -93,6 +93,20 @@ export async function deleteDocument(kbId: number, docId: number): Promise<void>
   return request(`/kb/${kbId}/documents/${docId}`, { method: 'DELETE' })
 }
 
+export interface SearchChunk {
+  document_id: number
+  chunk_index: number
+  text: string
+  filename: string
+}
+
+export async function searchDocuments(kbId: number, query: string, limit = 20): Promise<{ results: SearchChunk[] }> {
+  return request(`/kb/${kbId}/documents/search`, {
+    method: 'POST',
+    body: JSON.stringify({ query, limit }),
+  })
+}
+
 // Sessions
 export async function listSessions(kbId: number, signal?: AbortSignal): Promise<Session[]> {
   return request(`/kb/${kbId}/sessions`, { signal })

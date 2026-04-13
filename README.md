@@ -138,6 +138,7 @@ worker   (RQ Worker)
 - `POST /api/kb/{kb_id}/documents` — 上传文档
 - `GET /api/kb/{kb_id}/documents` — 列出文档
 - `DELETE /api/kb/{kb_id}/documents/{doc_id}` — 删除文档
+- `POST /api/kb/{kb_id}/documents/search` — 全文检索文档内容（关键词匹配）
 
 ### 对话
 - `POST /api/kb/{kb_id}/sessions` — 创建会话
@@ -172,6 +173,7 @@ worker   (RQ Worker)
 | 最新 | 缺少手动主题切换 | 添加 `useTheme` hook + 侧边栏切换按钮，支持手动明暗切换并持久化到 localStorage |
 | 最新 | 缺少国际化基础设施 | 添加 i18next + react-i18next，创建 zh/en 翻译文件，基础设施已就绪，可逐步重hardcoded 字符串 |
 | 最新 | 缺少邮箱验证/密码重置 | 添加验证邮件发送、邮箱验证、密码重置端点；新增 PasswordResetToken 模型；支持 SMTP 配置 |
+| 最新 | 缺少文档全文搜索 | 添加 POST /kb/{id}/documents/search 端点，支持关键词全文检索 |
 
 ---
 
