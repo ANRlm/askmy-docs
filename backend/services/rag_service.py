@@ -96,6 +96,14 @@ async def retrieve_chunks(kb_id: int, query: str, top_k: int = 5, score_threshol
                 "document_id": meta.get("document_id"),
                 "score": score,
             })
+
+    if not chunks:
+        logger.warning(f"No chunks retrieved for kb={kb_id}, query={query!r}, top_k={top_k}, score_threshold={score_threshold}")
+        # Log top scores even when below threshold
+        if results and results["distances"]:
+            top_scores = [1 - d for d in results["distances"][0][:3]]
+            logger.warning(f"Top scores below threshold: {top_scores}")
+
     return chunks
 
 
@@ -146,6 +154,7 @@ async def rag_chat_stream(
 
     # Short-circuit: no relevant chunks — return canned response without calling LLM
     if not chunks:
+        logger.warning(f"RAG short-circuit: no relevant chunks for kb={kb_id}, query={user_question!r}")
         no_result = "抱歉，知识库中没有找到与您问题相关的内容，建议您尝试换一种表述方式，或上传更多相关文档。"
         for i in range(0, len(no_result), 50):
             yield no_result[i:i+50], []
