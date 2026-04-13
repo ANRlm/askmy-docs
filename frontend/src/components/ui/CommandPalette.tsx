@@ -38,7 +38,7 @@ function highlightMatch(text: string, query: string) {
   return (
     <>
       <span>{text.slice(0, idx)}</span>
-      <span style={{ color: 'var(--accent)' }}>{text.slice(idx, idx + q.length)}</span>
+      <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{text.slice(idx, idx + q.length)}</span>
       <span>{text.slice(idx + q.length)}</span>
     </>
   )
@@ -184,7 +184,7 @@ export default function CommandPalette({ open, onClose, items, placeholder = 'Êê
                     >
                       <span
                         className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={{ background: 'var(--bg-hover)', color: 'var(--accent)' }}
+                        style={{ background: 'var(--bg-active)', color: 'var(--text-secondary)' }}
                       >
                         {item.icon}
                       </span>
@@ -197,7 +197,7 @@ export default function CommandPalette({ open, onClose, items, placeholder = 'Êê
                         </span>
                       )}
                       {globalIdx === selectedIdx && (
-                        <CornerDownLeft className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--accent)' }} />
+                        <CornerDownLeft className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text-secondary)' }} />
                       )}
                     </button>
                   )

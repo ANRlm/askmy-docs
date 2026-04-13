@@ -329,8 +329,8 @@ export default function DocumentModal({ kb, onClose }: Props) {
             <button
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-semibold interactive disabled:opacity-40"
-              style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[12px] font-semibold interactive disabled:opacity-40"
+              style={{ background: 'var(--text-primary)', color: 'var(--bg-base)' }}
               aria-label="上传文档"
             >
               {uploading
@@ -363,11 +363,10 @@ export default function DocumentModal({ kb, onClose }: Props) {
 
         {/* Drag-drop zone */}
         <div
-          className="mx-5 my-3 rounded-xl p-5 text-center transition-all duration-200 cursor-pointer"
+          className="mx-5 my-3 rounded-lg p-5 text-center transition-all duration-200 cursor-pointer"
           style={{
-            border: `2px dashed ${dragOver ? 'var(--accent)' : 'var(--border)'}`,
-            background: dragOver ? 'var(--accent-dim)' : 'transparent',
-            transform: dragOver ? 'scale(1.01)' : 'scale(1)',
+            border: `1px dashed ${dragOver ? 'var(--border-strong)' : 'var(--border)'}`,
+            background: dragOver ? 'var(--bg-hover)' : 'transparent',
           }}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -380,10 +379,10 @@ export default function DocumentModal({ kb, onClose }: Props) {
         >
           <Upload
             className="w-6 h-6 mx-auto mb-2 transition-colors"
-            style={{ color: dragOver ? 'var(--accent)' : 'var(--text-disabled)' }}
+            style={{ color: dragOver ? 'var(--text-secondary)' : 'var(--text-disabled)' }}
             aria-hidden="true"
           />
-          <p className="text-[12px] font-medium" style={{ color: dragOver ? 'var(--accent)' : 'var(--text-tertiary)' }}>
+          <p className="text-[12px] font-medium" style={{ color: dragOver ? 'var(--text-secondary)' : 'var(--text-tertiary)' }}>
             {dragOver ? '释放以上传' : '拖拽文件到此处，或点击选择文件'}
           </p>
           <p className="text-[11px] mt-1" style={{ color: 'var(--text-disabled)' }}>
@@ -419,7 +418,7 @@ export default function DocumentModal({ kb, onClose }: Props) {
                         className="h-full rounded-full transition-all duration-300"
                         style={{
                           width: `${item.progress}%`,
-                          background: item.status === 'error' ? 'var(--error)' : item.status === 'done' ? 'var(--success)' : 'var(--accent)',
+                          background: item.status === 'error' ? 'var(--error)' : item.status === 'done' ? 'var(--success)' : 'var(--text-secondary)',
                         }}
                       />
                     </div>
@@ -430,7 +429,7 @@ export default function DocumentModal({ kb, onClose }: Props) {
                       <button
                         onClick={() => retryUpload(item)}
                         className="text-[10px] interactive px-1.5 py-0.5 rounded"
-                        style={{ color: 'var(--accent)' }}
+                        style={{ color: 'var(--text-secondary)' }}
                         aria-label="重试上传"
                       >
                         重试

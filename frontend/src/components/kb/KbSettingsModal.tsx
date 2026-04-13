@@ -69,7 +69,7 @@ export default function KbSettingsModal({ kb, onClose, onUpdated }: Props) {
           style={{ borderBottom: '1px solid var(--border)' }}
         >
           <div className="flex items-center gap-2">
-            <Settings2 className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+            <Settings2 className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
             <h2 id="kb-settings-title" className="text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>
               知识库设置
             </h2>
@@ -149,8 +149,8 @@ export default function KbSettingsModal({ kb, onClose, onUpdated }: Props) {
               step={0.05}
               value={scoreThreshold}
               onChange={(e) => setScoreThreshold(Number(e.target.value))}
-              className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
-              style={{ accentColor: 'var(--accent)' }}
+              className="w-full h-1 rounded-full appearance-none cursor-pointer"
+              style={{ accentColor: 'var(--text-primary)' }}
             />
           </div>
         </div>
@@ -170,8 +170,8 @@ export default function KbSettingsModal({ kb, onClose, onUpdated }: Props) {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2 rounded-xl text-[12px] font-medium interactive disabled:opacity-50"
-            style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
+            className="px-4 py-2 rounded-lg text-[12px] font-medium interactive disabled:opacity-50"
+            style={{ background: 'var(--text-primary)', color: 'var(--bg-base)' }}
           >
             {saving ? '保存中...' : '保存设置'}
           </button>

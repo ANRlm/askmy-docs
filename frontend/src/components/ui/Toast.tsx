@@ -125,7 +125,7 @@ function ToastItem({
       bg: 'rgba(248, 113, 113, 0.08)',
     },
     info: {
-      icon: <Info className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--accent-hover)' }} />,
+      icon: <Info className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-secondary)' }} />,
       border: 'var(--border)',
       bg: 'var(--bg-elevated)',
     },

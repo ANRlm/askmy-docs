@@ -190,9 +190,9 @@ export default function Sidebar({
         >
           <div
             className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ background: 'var(--accent)' }}
+            style={{ background: 'var(--bg-active)', border: '1px solid var(--border-strong)' }}
           >
-            <BookOpen className="w-3.5 h-3.5" style={{ color: 'var(--accent-fg)' }} />
+            <BookOpen className="w-3.5 h-3.5" style={{ color: 'var(--text-secondary)' }} />
           </div>
           {!collapsed && (
             <span
@@ -297,7 +297,7 @@ export default function Sidebar({
                 <button
                   type="submit"
                   className="flex-1 py-1.5 rounded-lg text-[12px] font-medium interactive"
-                  style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
+                  style={{ background: 'var(--text-primary)', color: 'var(--bg-base)' }}
                 >
                   创建
                 </button>
@@ -333,7 +333,7 @@ export default function Sidebar({
                     : <ChevronRight className="w-3 h-3" />
                   }
                 </span>
-                <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" style={{ color: selectedKb?.id === kb.id ? 'var(--accent)' : 'var(--text-tertiary)' }} />
+                <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" style={{ color: selectedKb?.id === kb.id ? 'var(--text-primary)' : 'var(--text-tertiary)' }} />
                 <span className="flex-1 text-[13px] text-left truncate font-medium">
                   {kb.name}
                 </span>
@@ -461,8 +461,8 @@ export default function Sidebar({
             onClick={logout}
           >
             <div
-              className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-semibold uppercase"
-              style={{ background: 'var(--accent-dim)', color: 'var(--accent-hover)' }}
+              className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-medium uppercase"
+              style={{ background: 'var(--bg-active)', border: '1px solid var(--border-strong)', color: 'var(--text-secondary)' }}
             >
               {user?.email?.[0] || 'U'}
             </div>

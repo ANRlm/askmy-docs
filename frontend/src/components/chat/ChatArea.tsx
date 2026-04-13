@@ -76,7 +76,7 @@ function SkeletonMessageRow({ role }: { role: 'user' | 'assistant' }) {
       )}
       <div
         className="max-w-[72%] rounded-2xl px-4 py-3 space-y-2"
-        style={{ background: isUser ? 'var(--accent)' : 'var(--bg-hover)', border: '1px solid var(--border)' }}
+        style={{ background: 'var(--bg-hover)', border: '1px solid var(--border)' }}
       >
         <div className="h-3 w-32 skeleton rounded" />
         <div className="h-3 w-48 skeleton rounded" />
@@ -91,7 +91,7 @@ function TypingIndicator() {
   return (
     <div className="flex gap-3 animate-fade-in">
       <div className="ai-orb w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-        <span className="text-[9px] font-bold tracking-wide">AI</span>
+        <span className="text-[9px] font-medium">AI</span>
       </div>
       <div
         className="px-4 py-3 rounded-2xl rounded-tl-md"
@@ -102,7 +102,7 @@ function TypingIndicator() {
             <span
               key={i}
               className="w-1.5 h-1.5 rounded-full inline-block animate-pulse-dot"
-              style={{ background: 'var(--accent)', animationDelay: `${i * 0.18}s` }}
+              style={{ background: 'var(--text-tertiary)', animationDelay: `${i * 0.18}s` }}
             />
           ))}
           <span className="text-[11px] ml-1" style={{ color: 'var(--text-tertiary)' }}>正在思考...</span>
@@ -411,7 +411,7 @@ function UserBubble({ msg, isStreaming, onRetrace }: UserBubbleProps) {
               onClick={handleSubmit}
               disabled={!draft.trim()}
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[12px] font-medium interactive disabled:opacity-40"
-              style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
+              style={{ background: 'var(--bg-active)', border: '1px solid var(--border-strong)', color: 'var(--text-primary)' }}
               aria-label="重新生成"
             >
               <RotateCcw className="w-3 h-3" />重新生成
@@ -432,8 +432,9 @@ function UserBubble({ msg, isStreaming, onRetrace }: UserBubbleProps) {
         <div
           className="px-4 py-3 rounded-2xl rounded-tr-md text-sm leading-relaxed"
           style={{
-            background: 'var(--accent)',
-            color: 'var(--accent-fg)',
+            background: 'var(--bg-active)',
+            border: '1px solid var(--border)',
+            color: 'var(--text-primary)',
           }}
         >
           <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -481,12 +482,12 @@ function AssistantBubble({ msg, onRetry }: { msg: Message; onRetry?: (text: stri
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* Gradient orb avatar */}
+      {/* Minimal orb avatar */}
       <div
-        className="ai-orb w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 animate-orb-glow"
+        className="ai-orb w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
         aria-hidden="true"
       >
-        <span className="text-[9px] font-bold tracking-wide">AI</span>
+        <span className="text-[9px] font-medium">AI</span>
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-sm leading-relaxed" style={{ color: 'var(--text-primary)' }}>
@@ -512,7 +513,7 @@ function AssistantBubble({ msg, onRetry }: { msg: Message; onRetry?: (text: stri
                   <span
                     key={i}
                     className="w-1.5 h-1.5 rounded-full inline-block animate-pulse-dot"
-                    style={{ background: 'var(--accent)', animationDelay: `${i * 0.18}s` }}
+                    style={{ background: 'var(--text-tertiary)', animationDelay: `${i * 0.18}s` }}
                   />
                 ))}
               </span>
@@ -571,12 +572,12 @@ function AssistantBubble({ msg, onRetry }: { msg: Message; onRetry?: (text: stri
 function EmptyState({ kb }: { kb: KnowledgeBase | null }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center">
-      {/* Gradient orb instead of plain circle */}
+      {/* Minimal orb */}
       <div
-        className="ai-orb w-14 h-14 rounded-full flex items-center justify-center mb-5 animate-orb-glow"
+        className="ai-orb w-14 h-14 rounded-full flex items-center justify-center mb-5"
         aria-hidden="true"
       >
-        <span className="text-xs font-bold tracking-wide">AI</span>
+        <span className="text-xs font-medium">AI</span>
       </div>
       <p className="text-sm font-medium" style={{ color: 'var(--text-tertiary)' }}>
         {kb ? '选择或新建会话' : '请先选择知识库'}
@@ -708,7 +709,7 @@ export default function ChatArea({ kb, session, messages, isStreaming, isLoading
           </h2>
           <p className="text-[11px]" style={{ color: 'var(--text-disabled)' }}>
             {kb?.name}
-            {isStreaming && <span className="ml-2" style={{ color: 'var(--accent)' }}>生成中...</span>}
+            {isStreaming && <span className="ml-2" style={{ color: 'var(--text-secondary)' }}>生成中...</span>}
           </p>
         </div>
       </div>
@@ -728,10 +729,10 @@ export default function ChatArea({ kb, session, messages, isStreaming, isLoading
         ) : messages.length === 0 ? (
           <div className="text-center mt-20">
             <div
-              className="ai-orb w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-4 animate-orb-glow"
+              className="ai-orb w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-4"
               aria-hidden="true"
             >
-              <span className="text-[9px] font-bold tracking-wide">AI</span>
+              <span className="text-[9px] font-medium">AI</span>
             </div>
             <p className="text-sm" style={{ color: 'var(--text-disabled)' }}>
               向 AI 提问，从知识库中检索相关内容来回答
@@ -764,7 +765,7 @@ export default function ChatArea({ kb, session, messages, isStreaming, isLoading
             <button
               onClick={() => setShowPreview((p) => !p)}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] interactive"
-              style={{ color: showPreview ? 'var(--accent)' : 'var(--text-disabled)', background: showPreview ? 'var(--accent-dim)' : 'transparent' }}
+              style={{ color: showPreview ? 'var(--text-primary)' : 'var(--text-disabled)', background: showPreview ? 'var(--bg-hover)' : 'transparent' }}
               aria-label={showPreview ? '隐藏预览' : '预览格式'}
             >
               {showPreview ? <X className="w-3 h-3" /> : null}
@@ -855,7 +856,7 @@ export default function ChatArea({ kb, session, messages, isStreaming, isLoading
                 onClick={handleSend}
                 disabled={!input.trim() || isOverLimit || sttLoading || recording}
                 className="interactive-icon w-8 h-8 flex items-center justify-center rounded-xl disabled:opacity-25 disabled:cursor-not-allowed"
-                style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
+                style={{ background: 'var(--text-primary)', color: 'var(--bg-base)' }}
                 title="发送"
                 aria-label="发送消息"
               >
