@@ -416,6 +416,13 @@ function AppInner() {
           onRetrace={handleRetrace}
           isMobile={isMobile}
           onOpenDrawer={() => setDrawerOpen(true)}
+          onDelete={(msgId) => {
+            setMessagesBySession((prev) => {
+              const list = prev.get(selectedSession!.id)
+              if (!list) return prev
+              return new Map(prev).set(selectedSession!.id, list.filter((m) => m.id !== msgId))
+            })
+          }}
         />
       </main>
       <CommandPalette

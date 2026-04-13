@@ -252,12 +252,6 @@ async def rag_chat_stream(
     yield "", sources
 
 
-async def should_compress_history(history_messages: list[dict]) -> bool:
-    """判断是否需要压缩历史（超过 10 轮）"""
-    rounds = len(history_messages) // 2
-    return rounds > MAX_HISTORY_ROUNDS
-
-
 async def get_new_summary(
     existing_summary: str | None,
     old_messages: list[dict],

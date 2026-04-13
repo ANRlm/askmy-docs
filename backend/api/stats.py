@@ -5,9 +5,8 @@ from pydantic import BaseModel
 from database import get_db
 from models.user import User
 from models.message import Message
-from models.feedback import Feedback
+from models.feedback import Feedback, RetrievalLog
 from models.session import Session
-from models.document import Document
 from middleware.auth import get_current_user
 from middleware.rate_limit import check_rate_limit
 

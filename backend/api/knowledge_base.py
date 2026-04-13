@@ -5,7 +5,6 @@ from pydantic import BaseModel
 from database import get_db
 from models.user import User
 from models.knowledge_base import KnowledgeBase
-from models.document import Document
 from middleware.auth import get_current_user
 from middleware.rate_limit import check_rate_limit
 from chroma_client import delete_collection
