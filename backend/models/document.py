@@ -10,7 +10,7 @@ class Document(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     filename = Column(String(500), nullable=False)
     file_path = Column(String(1000), nullable=False)
-    status = Column(String(20), nullable=False, default="pending")  # pending/processing/ready/failed
+    status = Column(String(20), nullable=False, default="pending")  # pending/processing/done/failed
     chunk_count = Column(Integer, nullable=True)
     error_msg = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

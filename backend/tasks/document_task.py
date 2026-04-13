@@ -104,7 +104,7 @@ async def _process_document_async(document_id: int):
             )
 
             # 更新文档状态
-            doc.status = "ready"
+            doc.status = "done"
             doc.chunk_count = len(chunks)
             await db.commit()
             logger.info(f"文档 {doc.filename} 处理完成，写入 {len(chunks)} 个向量")

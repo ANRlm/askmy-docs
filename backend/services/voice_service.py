@@ -2,7 +2,7 @@ import os
 import base64
 import dashscope
 from dashscope.audio.tts_v2 import SpeechSynthesizer
-from openai import OpenAI
+from openai import AsyncOpenAI
 from config import settings
 from loguru import logger
 
@@ -12,10 +12,10 @@ dashscope.api_key = settings.dashscope_api_key
 _stt_client = None
 
 
-def _get_stt_client() -> OpenAI:
+def _get_stt_client() -> AsyncOpenAI:
     global _stt_client
     if _stt_client is None:
-        _stt_client = OpenAI(
+        _stt_client = AsyncOpenAI(
             api_key=settings.dashscope_api_key,
             base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
         )
@@ -32,7 +32,7 @@ async def speech_to_text(audio_bytes: bytes, audio_format: str = "wav") -> str:
     audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
 
     try:
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model=settings.stt_model,
             messages=[
                 {
