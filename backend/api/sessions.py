@@ -227,21 +227,15 @@ async def chat(
     top_k = kb_row.top_k if kb_row else 5
     score_threshold = kb_row.score_threshold if kb_row else 0.5
 
-    # 获取历史消息（只取最近 20 条用于上下文，压缩判断用计数）
-    from sqlalchemy import func
-    msg_count_result = await db.execute(
-        select(func.count()).select_from(Message).where(Message.session_id == session_id)
-    )
-    total_msg_count = msg_count_result.scalar() or 0
-
-    # Only load last 20 messages for LLM context
+    # 获取历史消息（只取最近 6 条用于上下文，压缩判断用 LIMIT 22）
     recent_result = await db.execute(
         select(Message)
         .where(Message.session_id == session_id)
         .order_by(Message.created_at.desc())
-        .limit(20)
+        .limit(22)
     )
     recent_messages = recent_result.scalars().all()
+    total_msg_count = len(recent_messages)
     # Preserve chronological order for the LLM
     history = [{"role": m.role, "content": m.content} for m in reversed(list(recent_messages))]
 

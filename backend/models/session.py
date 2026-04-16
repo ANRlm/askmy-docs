@@ -1,8 +1,11 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func, Text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func, Text, Index
 from database import Base
 
 
 class Session(Base):
+    __table_args__ = (
+        Index("ix_sessions_kb_updated", "kb_id", "updated_at"),
+    )
     __tablename__ = "sessions"
 
     id = Column(Integer, primary_key=True, index=True)

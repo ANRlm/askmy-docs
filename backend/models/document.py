@@ -1,8 +1,11 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func, Text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func, Text, Index
 from database import Base
 
 
 class Document(Base):
+    __table_args__ = (
+        Index("ix_documents_kb_status", "kb_id", "status"),
+    )
     __tablename__ = "documents"
 
     id = Column(Integer, primary_key=True, index=True)

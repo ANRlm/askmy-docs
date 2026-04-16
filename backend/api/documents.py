@@ -315,41 +315,41 @@ async def search_documents(
 
         results = await asyncio.to_thread(
             collection.get,
+            where_document={"$contains": query_lower},
             include=["documents", "metadatas"],
         )
 
         matches: list[SearchChunk] = []
         for i, doc_text in enumerate(results.get("documents", [])):
-            if doc_text and query_lower in doc_text.lower():
-                meta = (
-                    results.get("metadatas", [])[i]
-                    if i < len(results.get("metadatas", []))
-                    else {}
-                )
-                doc_id = int(meta.get("document_id", 0))
-                chunk_idx = int(meta.get("chunk_index", 0))
-                filename = meta.get("filename", "unknown")
+            meta = (
+                results.get("metadatas", [])[i]
+                if i < len(results.get("metadatas", []))
+                else {}
+            )
+            doc_id = int(meta.get("document_id", 0))
+            chunk_idx = int(meta.get("chunk_index", 0))
+            filename = meta.get("filename", "unknown")
 
-                doc_result = await db.execute(
-                    select(Document.filename).where(
-                        Document.id == doc_id, Document.kb_id == kb_id
-                    )
+            doc_result = await db.execute(
+                select(Document.filename).where(
+                    Document.id == doc_id, Document.kb_id == kb_id
                 )
-                row = doc_result.scalar_one_or_none()
-                if row:
-                    filename = row
+            )
+            row = doc_result.scalar_one_or_none()
+            if row:
+                filename = row
 
-                matches.append(
-                    SearchChunk(
-                        document_id=doc_id,
-                        chunk_index=chunk_idx,
-                        text=doc_text[:500],
-                        filename=filename,
-                    )
+            matches.append(
+                SearchChunk(
+                    document_id=doc_id,
+                    chunk_index=chunk_idx,
+                    text=doc_text[:500],
+                    filename=filename,
                 )
+            )
 
-                if len(matches) >= body.limit:
-                    break
+            if len(matches) >= body.limit:
+                break
 
         return {"results": [m.model_dump() for m in matches]}
 

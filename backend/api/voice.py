@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -48,7 +50,7 @@ async def tts(
     if not body.text.strip():
         raise HTTPException(status_code=400, detail="文本不能为空")
 
-    audio_bytes = text_to_speech_stream(body.text)
+    audio_bytes = await asyncio.to_thread(text_to_speech_stream, body.text)
     return Response(
         content=audio_bytes,
         media_type="audio/mpeg",

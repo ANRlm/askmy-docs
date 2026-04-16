@@ -5,7 +5,7 @@ from config import settings
 # 将 postgresql:// 替换为 postgresql+asyncpg://
 DATABASE_URL = settings.database_url.replace("postgresql://", "postgresql+asyncpg://")
 
-engine = create_async_engine(DATABASE_URL, echo=False)
+engine = create_async_engine(DATABASE_URL, echo=False, pool_size=20, max_overflow=10, pool_recycle=3600)
 AsyncSessionLocal = async_sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
 )
