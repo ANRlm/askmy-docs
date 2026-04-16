@@ -142,14 +142,14 @@ askmy-docs/
 │                    Docker Compose                       │
 │                                                         │
 │  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐    │
-│  │   frontend  │   │   backend  │   │   worker    │    │
-│  │  (Nginx)   │   │ (FastAPI)  │   │ (RQ Worker) │    │
-│  │   :3000    │   │   :8000    │   │             │    │
+│  │   frontend  │   │   backend   │   │   worker    │    │
+│  │  (Nginx)    │   │ (FastAPI)   │   │ (RQ Worker) │    │
+│  │   :3000     │   │   :8000     │   │             │    │
 │  └─────────────┘   └─────────────┘   └─────────────┘    │
 │                          │                              │
 │         ┌────────────────┼────────────────┐             │
 │         │                │                │             │
-│   PostgreSQL         Redis          Chroma              │
+│     PostgreSQL         Redis           Chroma           │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 ```
