@@ -17,6 +17,7 @@ class CreateKBRequest(BaseModel):
     description: str = ""
     top_k: int = 5
     score_threshold: float = 0.5
+    system_prompt: str | None = None
 
 
 class UpdateKBRequest(BaseModel):
@@ -24,6 +25,7 @@ class UpdateKBRequest(BaseModel):
     description: str | None = None
     top_k: int | None = None
     score_threshold: float | None = None
+    system_prompt: str | None = None
 
 
 @router.post("", summary="创建知识库")
@@ -40,6 +42,7 @@ async def create_knowledge_base(
         description=body.description,
         top_k=body.top_k,
         score_threshold=body.score_threshold,
+        system_prompt=body.system_prompt,
     )
     db.add(kb)
     await db.commit()
@@ -50,6 +53,7 @@ async def create_knowledge_base(
         "description": kb.description,
         "top_k": kb.top_k,
         "score_threshold": kb.score_threshold,
+        "system_prompt": kb.system_prompt,
         "created_at": kb.created_at,
     }
 
@@ -72,6 +76,7 @@ async def list_knowledge_bases(
             "description": k.description,
             "top_k": k.top_k,
             "score_threshold": k.score_threshold,
+            "system_prompt": k.system_prompt,
             "created_at": k.created_at,
         }
         for k in kbs
@@ -102,6 +107,8 @@ async def update_knowledge_base(
         kb.top_k = body.top_k
     if body.score_threshold is not None:
         kb.score_threshold = body.score_threshold
+    if body.system_prompt is not None:
+        kb.system_prompt = body.system_prompt if body.system_prompt else None
     await db.commit()
     await db.refresh(kb)
     return {
@@ -110,6 +117,7 @@ async def update_knowledge_base(
         "description": kb.description,
         "top_k": kb.top_k,
         "score_threshold": kb.score_threshold,
+        "system_prompt": kb.system_prompt,
         "created_at": kb.created_at,
     }
 

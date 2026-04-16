@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { X, Settings2, Database, Zap } from 'lucide-react'
+import { X, Settings2, Database, Zap, MessageSquare } from 'lucide-react'
 import * as api from '../../api'
 import type { KnowledgeBase } from '../../types'
 import { useToast } from '../ui/Toast'
@@ -15,6 +15,7 @@ export default function KbSettingsModal({ kb, onClose, onUpdated }: Props) {
   const { toast } = useToast()
   const [topK, setTopK] = useState(kb.top_k)
   const [scoreThreshold, setScoreThreshold] = useState(kb.score_threshold)
+  const [systemPrompt, setSystemPrompt] = useState(kb.system_prompt || '')
   const [saving, setSaving] = useState(false)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const modalRef = useFocusTrap<HTMLDivElement>(true, closeButtonRef)
@@ -30,7 +31,7 @@ export default function KbSettingsModal({ kb, onClose, onUpdated }: Props) {
     }
     setSaving(true)
     try {
-      const updated = await api.updateKB(kb.id, { top_k: topK, score_threshold: scoreThreshold })
+      const updated = await api.updateKB(kb.id, { top_k: topK, score_threshold: scoreThreshold, system_prompt: systemPrompt || null })
       onUpdated(updated)
       toast('设置已保存', 'success')
       onClose()
@@ -151,6 +152,31 @@ export default function KbSettingsModal({ kb, onClose, onUpdated }: Props) {
               onChange={(e) => setScoreThreshold(Number(e.target.value))}
               className="w-full h-1 rounded-full appearance-none cursor-pointer"
               style={{ accentColor: 'var(--text-primary)' }}
+            />
+          </div>
+
+          {/* System Prompt */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
+              <label className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                系统提示词 (system_prompt)
+              </label>
+            </div>
+            <p className="text-[11px]" style={{ color: 'var(--text-disabled)' }}>
+              每次 RAG 检索时附加到上下文的系统指令，决定 AI 的行为和回答风格
+            </p>
+            <textarea
+              value={systemPrompt}
+              onChange={(e) => setSystemPrompt(e.target.value)}
+              rows={4}
+              className="w-full px-3 py-2 rounded-xl text-[13px] focus:outline-none resize-none"
+              style={{
+                background: 'var(--bg-input)',
+                border: '1px solid var(--border)',
+                color: 'var(--text-primary)',
+              }}
+              placeholder="例如：你是一个专业的技术助手，始终用简洁的方式回答..."
             />
           </div>
         </div>

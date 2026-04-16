@@ -11,6 +11,7 @@ export interface KnowledgeBase {
   description: string
   top_k: number
   score_threshold: number
+  system_prompt?: string | null
   created_at: string
 }
 

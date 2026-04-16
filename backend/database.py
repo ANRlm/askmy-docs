@@ -70,3 +70,18 @@ async def _run_migrations(conn) -> None:
             "CREATE INDEX IF NOT EXISTS ix_password_reset_tokens_token ON password_reset_tokens(token)"
         )
     )
+    # v2: add system_prompt to knowledge_bases
+    await conn.execute(
+        text("ALTER TABLE knowledge_bases ADD COLUMN IF NOT EXISTS system_prompt TEXT")
+    )
+    # v2: add expires_at to sessions
+    await conn.execute(
+        text("ALTER TABLE sessions ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP WITH TIME ZONE")
+    )
+    # v2: add composite indexes
+    await conn.execute(
+        text("CREATE INDEX IF NOT EXISTS ix_sessions_kb_updated ON sessions(kb_id, updated_at)")
+    )
+    await conn.execute(
+        text("CREATE INDEX IF NOT EXISTS ix_documents_kb_status ON documents(kb_id, status)")
+    )

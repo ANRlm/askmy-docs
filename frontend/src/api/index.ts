@@ -72,7 +72,7 @@ export async function deleteKB(kbId: number): Promise<void> {
   return request(`/kb/${kbId}`, { method: 'DELETE' })
 }
 
-export async function updateKB(kbId: number, data: { name?: string; description?: string; top_k?: number; score_threshold?: number }): Promise<KnowledgeBase> {
+export async function updateKB(kbId: number, data: { name?: string; description?: string; top_k?: number; score_threshold?: number; system_prompt?: string | null }): Promise<KnowledgeBase> {
   return request(`/kb/${kbId}`, { method: 'PATCH', body: JSON.stringify(data) })
 }
 
