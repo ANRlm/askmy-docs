@@ -54,7 +54,7 @@ AskMyDocs 是一款开源的私有知识库问答系统，支持上传 PDF、Mar
 | 组件 | 说明 |
 |------|------|
 | 容器化 | Docker Compose（6 个服务） |
-| 服务端口 | Frontend 3000 / Backend 8000 / Chroma 8001 |
+| 服务端口 | Frontend 3001 / Backend 8002 / Chroma 8001 |
 
 ---
 
@@ -82,7 +82,7 @@ docker compose ps
 
 启动后访问：
 
-- **前端界面**：http://localhost:3000
+- **前端界面**：http://localhost:3001
 - **API 文档**：http://localhost:8000/docs
 
 ### 已有数据库升级
@@ -158,8 +158,8 @@ askmy-docs/
 
 | 服务 | 端口 | 说明 |
 |------|------|------|
-| frontend | 3000 | React 前端，Nginx 反向代理 |
-| backend | 8000 | FastAPI 后端，提供 REST API |
+| frontend | 3001 | React 前端，Nginx 反向代理 |
+| backend | 8002 | FastAPI 后端，提供 REST API |
 | worker | - | RQ 异步任务处理器 |
 | postgres | 5432 | PostgreSQL 15 |
 | redis | 6379 | Redis 7 |
@@ -400,6 +400,7 @@ pnpm build
 | 最新 | 缺少邮箱验证/密码重置 | 添加验证邮件发送、邮箱验证、密码重置端点 |
 | 最新 | 缺少文档全文搜索 | 添加 search 端点 |
 | 最新 | 注册/登录 HTTP 500 | 添加迁移脚本 `add_email_verification.py` |
+| 最新 | 代码质量检查失败（ruff） | 修复未使用导入、歧义变量名、无占位符 f-string 等 35 处问题 |
 
 ---
 
