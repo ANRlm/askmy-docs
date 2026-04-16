@@ -11,7 +11,7 @@ AskMyDocs 是一款开源的私有知识库问答系统，支持上传 PDF、Mar
 ### 核心特性
 
 - **文档上传与解析**：支持 PDF、Markdown、TXT 格式，异步解析、分块、Embedding 存储
-- **RAG 对话**：多轮对话，流式 SSE 输出，可展开的引用来源列表
+- **RAG 对话**：多轮对话，流式 SSE 输出，可展开的引用来源列表，支持为每个知识库设置专属系统提示词
 - **语音交互**：浏览器录音 → STT 语音识别 → 发送问题；TTS 朗读 AI 回答
 - **用户系统**：注册 / 登录 / JWT 鉴权 / 邮箱验证 / 密码重置
 - **限流保护**：滑动窗口限流，每用户每分钟 30 次请求
@@ -182,6 +182,8 @@ askmy-docs/
 - 异步解析：文本提取 → 分块 → Embedding → Chroma 向量存储
 - 文档处理状态实时轮询
 - 文档全文搜索（关键词匹配）
+- 可设置系统提示词（system_prompt），控制 RAG 回答风格和行为
+- 可调整检索数量（top_k）和相似度阈值（score_threshold）
 
 ### 对话
 
@@ -189,6 +191,7 @@ askmy-docs/
 - 可展开的引用来源列表（文件名、片段、相关度）
 - 对 AI 回答点赞 / 踩反馈
 - 超过 10 轮历史自动摘要压缩
+- 分享会话链接（30 天有效期）
 
 ### 语音交互
 
@@ -401,6 +404,13 @@ pnpm build
 | 最新 | 缺少文档全文搜索 | 添加 search 端点 |
 | 最新 | 注册/登录 HTTP 500 | 添加迁移脚本 `add_email_verification.py` |
 | 最新 | 代码质量检查失败（ruff） | 修复未使用导入、歧义变量名、无占位符 f-string 等 35 处问题 |
+| 最新 | API Key 存储不安全 | SHA256 升级为 PBKDF2+salt（10 万次迭代） |
+| 最新 | 文档搜索全表加载 | 改用 Chroma where_document 服务端过滤 |
+| 最新 | 消息获取浪费 | 获取条数从 20 优化为 6，减少不必要的 DB 查询 |
+| 最新 | 数据库连接池未配置 | 添加 pool_size=20, max_overflow=10 |
+| 最新 | TTS 同步阻塞 worker | 改为 asyncio.to_thread 异步调用 |
+| 最新 | worker 无 healthcheck | 添加 RQ worker 健康检查 |
+| 最新 | 缺少复合索引 | 添加 sessions(kb_id,updated_at) 和 documents(kb_id,status) 索引 |
 
 ---
 
