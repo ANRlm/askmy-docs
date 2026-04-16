@@ -155,6 +155,7 @@ async def rag_chat_stream(
     user_question: str,
     top_k: int = 5,
     score_threshold: float = 0.5,
+    system_prompt: str | None = None,
 ) -> AsyncGenerator[tuple[str, list[dict]], None]:
     """
     RAG 问答流式生成器
@@ -228,7 +229,7 @@ async def rag_chat_stream(
 
     system_message = {
         "role": "system",
-        "content": SYSTEM_PROMPT.format(context=context),
+        "content": (system_prompt or SYSTEM_PROMPT).format(context=context),
     }
     user_message = {"role": "user", "content": user_question}
 

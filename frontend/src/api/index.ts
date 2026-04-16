@@ -141,10 +141,10 @@ export async function renameSession(sessionId: number, title: string): Promise<S
 }
 
 export async function getMessages(sessionId: number): Promise<Array<{
-  id: number; role: string; content: string; sources: Source[] | null; created_at: string
+  id: number; role: string; content: string; sources: Source[] | null; created_at: string; isError?: boolean
 }>> {
   const data = await request<{ messages: Array<{ id: number; role: string; content: string; sources: Source[] | null; created_at: string }>; next_cursor: number | null; has_more: boolean }>(`/sessions/${sessionId}/messages`)
-  return data.messages
+  return data.messages.map((m) => ({ ...m, isError: m.content.startsWith('错误:') || undefined }))
 }
 
 // Chat stream

@@ -5,7 +5,7 @@ from typing import List
 
 class Settings(BaseSettings):
     # 数据库
-    database_url: str = "postgresql://ai_user:ai_password@postgres:5432/ai_assistant"
+    database_url: str = ""
 
     # Redis
     redis_url: str = "redis://redis:6379/0"

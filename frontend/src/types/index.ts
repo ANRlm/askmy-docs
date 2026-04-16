@@ -45,6 +45,7 @@ export interface Message {
   sources?: Source[]
   response_time?: number
   streaming?: boolean
+  isError?: boolean
   created_at?: string  // ISO timestamp from backend
 }
 

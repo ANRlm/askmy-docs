@@ -14,5 +14,6 @@ class Session(Base):
     title = Column(String(500), nullable=False, default="新会话")
     summary = Column(Text, nullable=True)
     share_token = Column(String(64), nullable=True, unique=True, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

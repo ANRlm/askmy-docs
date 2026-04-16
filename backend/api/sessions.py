@@ -113,6 +113,8 @@ async def create_share_link(
 
     if not session.share_token:
         session.share_token = secrets.token_urlsafe(32)
+        from datetime import datetime, timedelta, timezone
+        session.expires_at = datetime.now(timezone.utc) + timedelta(days=30)
         await db.commit()
 
     return {"share_url": f"/api/share/{session.share_token}"}
@@ -129,6 +131,10 @@ async def get_shared_session(
     session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="分享链接无效或已失效")
+
+    from datetime import datetime, timezone as tz
+    if session.expires_at and session.expires_at < datetime.now(tz.utc):
+        raise HTTPException(status_code=410, detail="分享链接已过期")
 
     result = await db.execute(
         select(Message).where(Message.session_id == session.id).order_by(Message.created_at)
@@ -221,11 +227,12 @@ async def chat(
 
     # Fetch KB-level RAG params
     kb_result = await db.execute(
-        select(KnowledgeBase.top_k, KnowledgeBase.score_threshold).where(KnowledgeBase.id == session.kb_id)
+        select(KnowledgeBase.top_k, KnowledgeBase.score_threshold, KnowledgeBase.system_prompt).where(KnowledgeBase.id == session.kb_id)
     )
     kb_row = kb_result.first()
     top_k = kb_row.top_k if kb_row else 5
     score_threshold = kb_row.score_threshold if kb_row else 0.5
+    kb_system_prompt = kb_row.system_prompt if kb_row else None
 
     # 获取历史消息（只取最近 6 条用于上下文，压缩判断用 LIMIT 22）
     recent_result = await db.execute(
@@ -302,6 +309,7 @@ async def chat(
                 user_question=body.message,
                 top_k=top_k,
                 score_threshold=score_threshold,
+                system_prompt=kb_system_prompt,
             ):
                 if text_chunk:
                     full_response.append(text_chunk)

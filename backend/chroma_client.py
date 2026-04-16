@@ -1,4 +1,5 @@
 import asyncio
+from loguru import logger
 from clients import get_chroma_client
 
 
@@ -23,8 +24,8 @@ def _sync_delete_collection(kb_id: int) -> None:
     collection_name = f"kb_{kb_id}"
     try:
         client.delete_collection(name=collection_name)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to delete Chroma collection: {e}")
 
 
 async def delete_collection(kb_id: int) -> None:

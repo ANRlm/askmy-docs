@@ -473,7 +473,7 @@ function UserBubble({ msg, isStreaming, onRetrace, onRequestCancel, highlightFn,
 /* ── AI message bubble ── */
 function AssistantBubble({ msg, onRetry, onDelete, highlightFn, searchQuery }: { msg: Message; onRetry?: (text: string) => void; onDelete?: (msgId: string) => void; highlightFn?: (text: string, query: string) => React.ReactNode; searchQuery?: string }) {
   const [hovered, setHovered] = useState(false)
-  const isError = msg.content.startsWith('错误:')
+  const isError = msg.isError === true
   const { toast } = useToast()
 
   return (
@@ -545,7 +545,7 @@ function AssistantBubble({ msg, onRetry, onDelete, highlightFn, searchQuery }: {
             <>
               {isError && onRetry && (
                 <button
-                  onClick={() => onRetry(msg.content.replace('错误: ', ''))}
+                  onClick={() => onRetry(msg.content)}
                   className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] interactive"
                   style={{ background: 'var(--error-bg)', color: 'var(--error)' }}
                   aria-label="重试"

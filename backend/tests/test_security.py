@@ -1,4 +1,4 @@
-from utils.security import generate_api_key, hash_api_key
+from utils.security import generate_api_key, hash_api_key, verify_api_key
 
 
 def test_generate_api_key_format():
@@ -7,12 +7,18 @@ def test_generate_api_key_format():
     assert len(key) == 51
 
 
-def test_hash_api_key_deterministic():
+def test_hash_and_verify_api_key():
     key = "sk-abc123test"
     h = hash_api_key(key)
-    assert hash_api_key(key) == h
     assert h != key
-    assert len(h) == 64
+    assert ":" in h  # salt:hash format
+    assert verify_api_key(key, h)
+
+
+def test_verify_api_key_wrong_key():
+    key = "sk-abc123test"
+    h = hash_api_key(key)
+    assert not verify_api_key("sk-wrongkey", h)
 
 
 def test_generate_api_key_uniqueness():

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float, func
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float, func, Text
 from database import Base
 
 
@@ -11,4 +11,5 @@ class KnowledgeBase(Base):
     description = Column(String(1000), nullable=True)
     top_k = Column(Integer, nullable=False, default=5)
     score_threshold = Column(Float, nullable=False, default=0.5)
+    system_prompt = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
