@@ -5,7 +5,7 @@
 
 import asyncio
 from sqlalchemy import text
-from database import AsyncSessionLocal, engine
+from database import engine
 
 
 async def migrate():

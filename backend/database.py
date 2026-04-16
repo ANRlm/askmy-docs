@@ -25,16 +25,6 @@ async def get_db():
 
 async def init_db():
     async with engine.begin() as conn:
-        from models import (
-            user,
-            knowledge_base,
-            document,
-            session,
-            message,
-            feedback,
-            password_reset,
-            api_key,
-        )  # noqa
 
         await conn.run_sync(Base.metadata.create_all)
         await _run_migrations(conn)

@@ -1,6 +1,5 @@
 import asyncio
 
-from openai import AsyncOpenAI
 from config import settings
 from loguru import logger
 from typing import AsyncGenerator

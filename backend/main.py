@@ -75,7 +75,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     logger.warning(f"RequestValidationError: {errors}")
     messages = []
     for err in errors:
-        loc = ".".join(str(l) for l in err["loc"] if l != "body")
+        loc = ".".join(str(item) for item in err["loc"] if item != "body")
         messages.append(f"{loc}: {err['msg']}" if loc else err["msg"])
     message = "; ".join(messages) or "请求参数验证失败"
     return JSONResponse(

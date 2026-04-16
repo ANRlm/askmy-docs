@@ -22,7 +22,6 @@ from services.email_service import (
     send_password_reset_email,
 )
 from datetime import datetime, timedelta, timezone
-from config import settings
 
 router = APIRouter(prefix="/api/auth", tags=["用户与鉴权"])
 

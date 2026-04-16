@@ -55,5 +55,5 @@ async def check_ip_rate_limit(request: Request, limit: int = 10, window: int = 6
     if count > limit:
         raise HTTPException(
             status_code=429,
-            detail=f"请求过于频繁，请稍后再试",
+            detail="请求过于频繁，请稍后再试",
         )

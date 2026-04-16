@@ -1,4 +1,3 @@
-import os
 import base64
 import dashscope
 from dashscope.audio.tts_v2 import SpeechSynthesizer

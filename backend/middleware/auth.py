@@ -7,7 +7,6 @@ from database import get_db
 from models.user import User
 from models.api_key import ApiKey
 from utils.security import decode_jwt_token, hash_api_key
-from datetime import datetime, timezone
 
 security = HTTPBearer(auto_error=False)
 

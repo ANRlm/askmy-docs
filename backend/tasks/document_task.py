@@ -12,11 +12,7 @@ _engines: WeakValueDictionary[str, object] = WeakValueDictionary()
 
 def _get_engine():
     """Get or create a process-level async engine for the current DATABASE_URL."""
-    from sqlalchemy.ext.asyncio import (
-        create_async_engine,
-        AsyncSession,
-        async_sessionmaker,
-    )
+    from sqlalchemy.ext.asyncio import create_async_engine
     from config import settings
 
     DATABASE_URL = settings.database_url.replace(
@@ -42,7 +38,6 @@ def process_document(document_id: int):
 
 async def _process_document_async(document_id: int):
     from sqlalchemy import select
-    from config import settings
     from models.document import Document
     from models.knowledge_base import KnowledgeBase  # noqa: F401
     from models.user import User  # noqa: F401

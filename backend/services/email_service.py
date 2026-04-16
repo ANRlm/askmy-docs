@@ -1,5 +1,4 @@
 import secrets
-from datetime import datetime, timedelta, timezone
 from loguru import logger
 
 from config import settings

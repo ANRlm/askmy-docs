@@ -16,12 +16,12 @@ mock_logger = MagicMock()
 sys.modules["loguru"] = MagicMock()
 sys.modules["loguru"].logger = mock_logger
 
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy.pool import StaticPool
+from httpx import AsyncClient, ASGITransport  # noqa: E402
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession  # noqa: E402
+from sqlalchemy.pool import StaticPool  # noqa: E402
 
-from database import Base
-from utils.security import hash_password
+from database import Base  # noqa: E402
+from utils.security import hash_password  # noqa: E402
 
 
 @pytest.fixture(scope="session")

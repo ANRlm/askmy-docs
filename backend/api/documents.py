@@ -12,7 +12,7 @@ from models.document import Document
 from middleware.auth import get_current_user
 from middleware.rate_limit import check_rate_limit
 from config import settings
-from chroma_client import get_collection_async, delete_collection
+from chroma_client import get_collection_async
 from loguru import logger
 
 router = APIRouter(tags=["文档管理"])

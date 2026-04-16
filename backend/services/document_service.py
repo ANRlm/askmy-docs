@@ -1,8 +1,6 @@
-import os
 import re
 import csv
 from pathlib import Path
-from loguru import logger
 
 
 def _detect_encoding(file_path: str) -> str:
@@ -77,7 +75,7 @@ def extract_text_from_html(file_path: str) -> str:
         tag.decompose()
     text = soup.get_text(separator="\n", strip=True)
     # 合并空行
-    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    lines = [line.strip() for line in text.split("\n") if line.strip()]
     return "\n\n".join(lines)
 
 

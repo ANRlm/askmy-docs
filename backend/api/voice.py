@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
-from fastapi.responses import StreamingResponse, Response
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from database import get_db
@@ -7,7 +7,6 @@ from models.user import User
 from middleware.auth import get_current_user
 from middleware.rate_limit import check_rate_limit
 from services.voice_service import speech_to_text, text_to_speech_stream
-import io
 
 router = APIRouter(prefix="/api/voice", tags=["语音交互"])
 
