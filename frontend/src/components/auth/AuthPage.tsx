@@ -43,7 +43,7 @@ export default function AuthPage() {
         setVerifyState('error')
         setError(e.message || '验证失败')
       })
-  }, [])
+  }, [mode, urlToken])
 
   const switchMode = (m: 'login' | 'register') => {
     setMode(m)
